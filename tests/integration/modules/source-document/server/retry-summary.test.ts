@@ -153,7 +153,6 @@ describe("retry active result summary", () => {
         storageKey: "stored/edited-evidence",
         contentType: "image/jpeg",
         byteSize: 7,
-        finalizedAt: new Date(),
       })
       .returning();
     const editRetry = await submitSourceDocument({

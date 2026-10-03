@@ -150,7 +150,6 @@ describe("current-runtime target adapters", () => {
         storageKey: "stored/pending-evidence",
         contentType: "image/jpeg",
         byteSize: 7,
-        finalizedAt: new Date(),
       })
       .returning();
     const pending = await createPendingAttempt({

@@ -55,7 +55,6 @@ export function createDemoEnvironment(environment: Environment = process.env) {
     OPENAI_API_KEY: "demo-unused",
     OPENAI_BASE_URL: "http://127.0.0.1:1/v1",
     S3_ENDPOINT: `http://127.0.0.1:${s3Port}`,
-    S3_PUBLIC_ENDPOINT: `http://127.0.0.1:${s3Port}`,
     S3_REGION: "auto",
     S3_BUCKET: "cashier",
     S3_ACCESS_KEY_ID: "cashier",

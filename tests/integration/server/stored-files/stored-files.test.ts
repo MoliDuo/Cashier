@@ -60,7 +60,7 @@ describe("stored-file uploads and reads", () => {
     });
     expect(
       await getTestDb().query.storedFiles.findFirst({ where: eq(storedFiles.id, file.id) })
-    ).toMatchObject({ contentType: file.metadata.contentType, finalizedAt: expect.any(Date) });
+    ).toMatchObject({ contentType: file.metadata.contentType });
     expect([...storage.files.keys()]).toEqual([`stored/${file.id}`]);
   });
 
@@ -164,7 +164,6 @@ describe("stored-file uploads and reads", () => {
       contentType: "image/webp",
       byteSize: bytes.length,
       checksum: sha256(bytes),
-      finalizedAt: expect.any(Date),
     });
   });
 

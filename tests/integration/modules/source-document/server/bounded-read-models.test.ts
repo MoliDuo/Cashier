@@ -213,7 +213,6 @@ describe("bounded target read models", () => {
           storageKey: `bounded-ownership/${fileCount}/${index}`,
           contentType: "image/jpeg",
           byteSize: 1,
-          finalizedAt: new Date(),
         }))
       )
       .returning({ id: storedFiles.id });

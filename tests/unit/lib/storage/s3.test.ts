@@ -63,45 +63,12 @@ describe("S3StorageProvider", () => {
     ).rejects.toMatchObject({ code: "S3_UPLOAD_FAILED", statusCode: 503 });
   });
 
-  it("signs scoped uploads and reads bytes with metadata", async () => {
-    const send = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ContentLength: 3,
-        Body: { transformToByteArray: vi.fn(async () => new Uint8Array([1, 2, 3])) },
-        ContentType: "image/png",
-        Metadata: { sha256: "a".repeat(64) },
-      })
-      .mockResolvedValueOnce({});
-    const signer = vi.fn().mockResolvedValue("https://signed.example/upload");
-    const storage = new S3StorageProvider(
-      { send } as unknown as Pick<S3Client, "send">,
-      "cashier-images",
-      signer as never
-    );
+  it("downloads an object's bytes", async () => {
+    const send = vi.fn().mockResolvedValue({
+      Body: { transformToByteArray: vi.fn(async () => new Uint8Array([1, 2, 3])) },
+    });
 
-    await expect(
-      storage.presignUpload("temporary/target", "image/png", "a".repeat(64), 900)
-    ).resolves.toEqual({
-      url: "https://signed.example/upload",
-      requiredHeaders: {
-        "Content-Type": "image/png",
-        "x-amz-meta-sha256": "a".repeat(64),
-      },
-    });
-    await expect(storage.readObject("temporary/target")).resolves.toEqual({
-      bytes: Buffer.from([1, 2, 3]),
-      metadata: {
-        byteSize: 3,
-        contentType: "image/png",
-        metadata: { sha256: "a".repeat(64) },
-      },
-    });
-    expect(signer).toHaveBeenCalledWith(expect.anything(), expect.any(PutObjectCommand), {
-      expiresIn: 900,
-      signableHeaders: new Set(["content-type"]),
-      unhoistableHeaders: new Set(["x-amz-meta-sha256"]),
-    });
+    await expect(provider(send).download("stored/file")).resolves.toEqual(Buffer.from([1, 2, 3]));
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(GetObjectCommand);
   });
 

@@ -117,7 +117,6 @@ describe("splitSourceDocumentAction", () => {
           storageKey: `stored/split-evidence-${index}`,
           contentType: "image/jpeg",
           byteSize: 1,
-          finalizedAt: new Date(),
         }))
       )
       .returning();

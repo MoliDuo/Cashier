@@ -8,7 +8,6 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AppError } from "@/lib/errors";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
@@ -20,13 +19,6 @@ import {
 } from "./index";
 
 type ObjectClient = Pick<S3Client, "send">;
-type Presign = typeof getSignedUrl;
-
-export interface S3ObjectMetadata {
-  byteSize: number;
-  contentType: string;
-  metadata: Readonly<Record<string, string>>;
-}
 
 function isNotFound(error: unknown): boolean {
   if (error == null || typeof error !== "object") return false;
@@ -64,15 +56,12 @@ function createS3ClientConfig(): S3ClientConfig {
 
 export class S3StorageProvider implements ObjectStore {
   private client: ObjectClient | null;
-  private presignClient: S3Client | null = null;
 
   constructor(
     client?: ObjectClient,
-    private readonly configuredBucket?: string,
-    private readonly presign: Presign = getSignedUrl
+    private readonly configuredBucket?: string
   ) {
     this.client = client ?? null;
-    this.presignClient = client == null ? null : (client as S3Client);
   }
 
   private getClient(): ObjectClient {
@@ -82,14 +71,6 @@ export class S3StorageProvider implements ObjectStore {
 
   private getBucket(): string {
     return this.configuredBucket ?? runtimeEnv.s3Bucket;
-  }
-
-  private getPresignClient(): S3Client {
-    this.presignClient ??= new S3Client({
-      ...createS3ClientConfig(),
-      endpoint: runtimeEnv.s3PublicEndpoint ?? runtimeEnv.s3Endpoint,
-    });
-    return this.presignClient;
   }
 
   async upload(key: string, data: Buffer, contentType: string): Promise<void> {
@@ -105,65 +86,6 @@ export class S3StorageProvider implements ObjectStore {
       );
     } catch (error) {
       throw storageError("Failed to upload file to S3", "S3_UPLOAD_FAILED", key, error);
-    }
-  }
-
-  async presignUpload(
-    key: string,
-    contentType: string,
-    sha256: string,
-    expiresInSeconds: number
-  ): Promise<{ url: string; requiredHeaders: Readonly<Record<string, string>> }> {
-    assertSafeStorageKey(key);
-    try {
-      const requiredHeaders = {
-        "Content-Type": contentType,
-        "x-amz-meta-sha256": sha256,
-      } as const;
-      const url = await this.presign(
-        this.getPresignClient(),
-        new PutObjectCommand({
-          Bucket: this.getBucket(),
-          Key: key,
-          ContentType: contentType,
-          Metadata: { sha256 },
-        }),
-        {
-          expiresIn: expiresInSeconds,
-          signableHeaders: new Set(["content-type"]),
-          unhoistableHeaders: new Set(["x-amz-meta-sha256"]),
-        }
-      );
-      return { url, requiredHeaders };
-    } catch (error) {
-      throw storageError("Failed to sign S3 upload", "S3_PRESIGN_FAILED", key, error);
-    }
-  }
-
-  async readObject(key: string): Promise<{ bytes: Buffer; metadata: S3ObjectMetadata }> {
-    assertSafeStorageKey(key);
-    try {
-      const response = await this.getClient().send(
-        new GetObjectCommand({ Bucket: this.getBucket(), Key: key })
-      );
-      if (response.ContentLength == null || response.ContentType == null) {
-        throw storageError("S3 object metadata is incomplete", "S3_DOWNLOAD_FAILED", key);
-      }
-      if (response.Body == null) throw storageError("File not found in S3", "FILE_NOT_FOUND", key);
-      return {
-        bytes: Buffer.from(await response.Body.transformToByteArray()),
-        metadata: {
-          byteSize: response.ContentLength,
-          contentType: response.ContentType,
-          metadata: response.Metadata ?? {},
-        },
-      };
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      if (isNotFound(error)) {
-        throw storageError("File not found in S3", "FILE_NOT_FOUND", key, error);
-      }
-      throw storageError("Failed to read S3 object", "S3_DOWNLOAD_FAILED", key, error);
     }
   }
 

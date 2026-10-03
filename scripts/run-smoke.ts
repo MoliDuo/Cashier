@@ -104,7 +104,6 @@ async function main(): Promise<void> {
     OPENAI_API_KEY: "smoke-unused",
     OPENAI_BASE_URL: `http://127.0.0.1:${aiPort}/v1`,
     S3_ENDPOINT: storageEndpoint,
-    S3_PUBLIC_ENDPOINT: storageEndpoint,
     S3_BUCKET: "smoke-objects",
     S3_ACCESS_KEY_ID: "smoke-unused",
     S3_SECRET_ACCESS_KEY: "smoke-unused",

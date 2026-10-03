@@ -14,7 +14,7 @@ import {
   SUPPORTED_MIME_SET,
 } from "@/lib/storage/upload-policy";
 import { sourceDocumentFiles, storedFiles } from "@/persistence";
-import { checksum, durableKey, mapStoredFile, temporaryKey } from "./shared";
+import { checksum, durableKey, mapStoredFile } from "./shared";
 
 interface NewFile {
   id: string;
@@ -43,7 +43,6 @@ async function storeFiles(files: readonly NewFile[]): Promise<(typeof storedFile
         originalFilename: file.originalFilename,
         checksum: file.checksum,
         createdAt: now,
-        finalizedAt: now,
       }))
     )
     .returning();
@@ -83,12 +82,7 @@ export async function discardUnusedFiles(storedFileIds: readonly string[]): Prom
       )
       .returning({ id: storedFiles.id, storageKey: storedFiles.storageKey });
     const storage = getS3Storage();
-    await Promise.all(
-      deleted.flatMap((file) => [
-        storage.delete(file.storageKey),
-        storage.delete(temporaryKey(file.id)),
-      ])
-    );
+    await Promise.all(deleted.map((file) => storage.delete(file.storageKey)));
   } catch {
     logger.warn({ count: storedFileIds.length }, "Discarding unused stored files was incomplete");
   }

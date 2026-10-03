@@ -46,7 +46,6 @@ async function createLinkedStoredFile() {
       storageKey: "stored/private-file",
       contentType: "image/png",
       byteSize: 5,
-      finalizedAt: new Date(),
     })
     .returning();
   await db.insert(sourceDocumentFiles).values({

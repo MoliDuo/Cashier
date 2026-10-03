@@ -10,7 +10,6 @@ export interface RuntimeEnv {
   readonly authResendKey: string | undefined;
   readonly authEmailFrom: string;
   readonly s3Endpoint: string;
-  readonly s3PublicEndpoint: string | undefined;
   readonly s3Region: string;
   readonly s3Bucket: string;
   readonly s3AccessKeyId: string;
@@ -54,9 +53,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get s3Endpoint() {
     return getStartupEnvValue("S3_ENDPOINT");
-  },
-  get s3PublicEndpoint() {
-    return getStartupEnvValue("S3_PUBLIC_ENDPOINT");
   },
   get s3Region() {
     return getStartupEnvValue("S3_REGION");

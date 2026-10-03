@@ -127,15 +127,13 @@ describe("API v1 source-documents route", () => {
       expect(documentFilesRows).toHaveLength(1);
       expect(documentFilesRows[0]!.position).toBe(0);
 
-      // Verify the stored file is finalized with provider r2
+      // Verify the stored file and its object
       const storedFile = await db
         .select()
         .from(storedFiles)
         .where(eq(storedFiles.id, documentFilesRows[0]!.storedFileId))
         .then((rows) => rows[0]);
       expect(storedFile).not.toBeUndefined();
-      expect(storedFile!.finalizedAt).not.toBeNull();
-      // The server writes the stored object directly; nothing goes through temporary/.
       expect([...mockR2.files.keys()]).toEqual([storedFile!.storageKey]);
 
       // Verify the attempt is the document's queued processing attempt

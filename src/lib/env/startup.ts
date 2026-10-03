@@ -73,10 +73,6 @@ const startupEnvFields = {
       .default(getDefaultString("AUTH_EMAIL_FROM"))
   ),
   S3_ENDPOINT: z.preprocess(blankToUndefined, z.url({ error: "S3_ENDPOINT must be a valid URL" })),
-  S3_PUBLIC_ENDPOINT: z.preprocess(
-    blankToUndefined,
-    z.url({ error: "S3_PUBLIC_ENDPOINT must be a valid URL" }).optional()
-  ),
   S3_REGION: stringWithDefault("S3_REGION"),
   S3_BUCKET: requiredString("S3_BUCKET"),
   S3_ACCESS_KEY_ID: requiredString("S3_ACCESS_KEY_ID"),

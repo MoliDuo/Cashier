@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import "server-only";
 import type {
   AttemptFailureKind,
@@ -162,7 +162,7 @@ export async function createProcessingAttemptInTransaction(
       : await tx
           .select({ id: storedFiles.id, byteSize: storedFiles.byteSize })
           .from(storedFiles)
-          .where(and(inArray(storedFiles.id, fileIds), isNotNull(storedFiles.finalizedAt)));
+          .where(inArray(storedFiles.id, fileIds));
   if (foundStoredFiles.length !== fileIds.length) throw new NotFoundError("Stored file");
   const storedFileById = new Map(foundStoredFiles.map((file) => [file.id, file]));
   const storedFileRows = fileIds.map((id) => storedFileById.get(id)!);

@@ -186,7 +186,6 @@ export async function seedStoredFile(
     originalFilename: file.originalFilename ?? null,
     checksum: file.checksum ?? null,
     createdAt,
-    finalizedAt: createdAt,
   });
   return { id, storageKey };
 }

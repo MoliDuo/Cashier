@@ -19,22 +19,19 @@ async function seed() {
   const storage = new MemoryObjectStore();
   objectStore.current = storage;
   const now = Date.now();
-  // An object outside `stored/` and `temporary/` is never the sweep's to delete.
+  // An object outside `stored/` is never the sweep's to delete.
   const foreignPrefix = crypto.randomUUID();
-  const file = (name: string, createdAt: number, finalized: boolean) => ({
+  const file = (name: string, createdAt: number) => ({
     id: crypto.randomUUID(),
     storageKey: `stored/${name}`,
     contentType: "image/webp",
     byteSize: 1,
     createdAt: new Date(createdAt),
-    finalizedAt: finalized ? new Date(createdAt) : null,
   });
-  const stalePending = file("stale-pending", now - DAY_MS - 60_000, false);
-  const freshPending = file("fresh-pending", now - DAY_MS + 60_000, false);
-  const oldReady = file("old-ready", now - 3 * DAY_MS, true);
-  const unused = file("unused", now - 7 * DAY_MS - 60_000, true);
-  const used = file("used", now - 30 * DAY_MS, true);
-  const rows = [stalePending, freshPending, oldReady, unused, used];
+  const oldReady = file("old-ready", now - 3 * DAY_MS);
+  const unused = file("unused", now - 7 * DAY_MS - 60_000);
+  const used = file("used", now - 30 * DAY_MS);
+  const rows = [oldReady, unused, used];
   await db.insert(storedFiles).values(rows);
   const objectAt = async (key: string, modifiedAt: number) => {
     await storage.upload(key, Buffer.from(key));
@@ -48,34 +45,26 @@ async function seed() {
   await objectAt("stored/orphan", now - DAY_MS - 60_000);
   await objectAt(`${foreignPrefix}/stored/orphan`, now - DAY_MS - 60_000);
   await objectAt("stored/young-orphan", now - DAY_MS + 60_000);
-  await objectAt(`temporary/${stalePending.id}`, now - DAY_MS - 60_000);
-  await objectAt("temporary/abandoned", now - DAY_MS - 60_000);
-  await objectAt("temporary/session/target", now - 2 * DAY_MS);
-  await objectAt("temporary/in-flight", now - DAY_MS + 60_000);
   return {
     db,
     foreignPrefix,
     storage,
     objectAt,
-    stalePending,
-    freshPending,
     oldReady,
     used,
   };
 }
 
 describe("daily upload maintenance", () => {
-  it("deletes stale pending files, unused files, and old objects nothing names", async () => {
-    const { db, foreignPrefix, storage, freshPending, oldReady, used } = await seed();
+  it("deletes unused files and old objects nothing names", async () => {
+    const { db, foreignPrefix, storage, oldReady, used } = await seed();
 
     await expect(runDailyMaintenance()).resolves.toMatchObject({
-      pending_files: "done",
       unused_files: "done",
-      temporary_objects: "done",
       orphan_objects: "done",
     });
 
-    const kept = [freshPending, oldReady, used];
+    const kept = [oldReady, used];
     expect((await db.select().from(storedFiles)).map((row) => row.id).sort()).toEqual(
       kept.map((row) => row.id).sort()
     );
@@ -84,38 +73,24 @@ describe("daily upload maintenance", () => {
         ...kept.map((row) => row.storageKey),
         "stored/young-orphan",
         `${foreignPrefix}/stored/orphan`,
-        "temporary/in-flight",
       ].sort()
     );
   });
 
-  it("sweeps orphans under stored/ alone and leaves temporary objects to their own sweep", async () => {
-    const { db, foreignPrefix, storage, objectAt, stalePending } = await seed();
-    const stale = Date.now() - 2 * DAY_MS;
-    await objectAt(`temporary/${crypto.randomUUID()}/stored/upload`, stale);
-    const temporaryBefore = [...storage.files.keys()].filter(
-      (key) => key.startsWith("temporary/") && key !== `temporary/${stalePending.id}`
-    );
-    // With the temporary sweep down, only the orphan sweep could reach these.
+  it("keeps the rest of the sweep going when a step fails", async () => {
+    const { db, storage } = await seed();
     const listObjectsPage = storage.listObjectsPage.bind(storage);
     vi.spyOn(storage, "listObjectsPage").mockImplementation(async (prefix) => {
-      if (prefix === "temporary/") throw new Error("listing unavailable");
+      if (prefix === "") throw new Error("listing unavailable");
       return listObjectsPage(prefix);
     });
 
     await expect(runDailyMaintenance()).resolves.toMatchObject({
-      temporary_objects: "failed",
-      orphan_objects: "done",
+      unused_files: "done",
+      orphan_objects: "failed",
     });
 
-    const keys = [...storage.files.keys()];
-    expect(keys).not.toContain("stored/orphan");
-    expect(keys).toEqual(
-      expect.arrayContaining(["stored/young-orphan", `${foreignPrefix}/stored/orphan`])
-    );
-    expect(keys.filter((key) => key.startsWith("temporary/")).sort()).toEqual(
-      temporaryBefore.sort()
-    );
-    expect(await db.select().from(storedFiles)).toHaveLength(3);
+    expect(storage.files.has("stored/orphan")).toBe(true);
+    expect(await db.select().from(storedFiles)).toHaveLength(2);
   });
 });

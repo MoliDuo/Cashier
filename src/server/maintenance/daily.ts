@@ -13,20 +13,13 @@ import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
 import { refreshExchangeRates } from "@/modules/currency/server/exchange-rates";
-import { temporaryKey } from "@/server/stored-files/shared";
 
 const BATCH = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How long a ready file may go unused before it is deleted. */
 const UNUSED_FILE_GRACE_DAYS = 7;
 
-export type DailyStep =
-  | "expired_records"
-  | "exchange_rates"
-  | "pending_files"
-  | "unused_files"
-  | "temporary_objects"
-  | "orphan_objects";
+export type DailyStep = "expired_records" | "exchange_rates" | "unused_files" | "orphan_objects";
 
 export type DailyStepOutcome = "done" | "failed";
 
@@ -59,9 +52,7 @@ export async function runDailyMaintenance(
 
   await step("expired_records", () => deleteExpiredRecords(now));
   await step("exchange_rates", () => refreshExchangeRates(now));
-  await step("pending_files", () => deleteStalePendingFiles(now));
   await step("unused_files", () => deleteUnusedFiles(now));
-  await step("temporary_objects", () => deleteStaleTemporaryObjects(now));
   await step("orphan_objects", () => deleteOrphanObjects(now));
   return outcomes;
 }
@@ -105,37 +96,7 @@ async function deleteExpiredRecords(now: Date): Promise<void> {
 }
 
 /**
- * Deletes files planned over a day ago and never finalized, rows first and
- * then their objects. A document never takes a pending file, so none is in
- * use; an object whose delete fails is left for the orphan sweep.
- */
-async function deleteStalePendingFiles(now: Date): Promise<void> {
-  const dayAgo = new Date(now.getTime() - DAY_MS);
-  const storage = getS3Storage();
-  for (;;) {
-    const deleted = await db.execute<{ id: string; storageKey: string }>(sql`
-      DELETE FROM ${storedFiles} WHERE id IN (
-        SELECT file.id FROM ${storedFiles} AS file
-        WHERE file.finalized_at IS NULL
-          AND file.created_at < ${dayAgo}
-          AND NOT EXISTS (
-            SELECT 1 FROM ${sourceDocumentFiles} AS link
-            WHERE link.stored_file_id = file.id
-          )
-        LIMIT ${BATCH}
-      )
-      RETURNING id, storage_key AS "storageKey"
-    `);
-    const keys = deleted.rows.flatMap((file) => [file.storageKey, temporaryKey(file.id)]);
-    await runWithConcurrency(keys, 4, async (key) => {
-      await storage.delete(key);
-    });
-    if (deleted.rows.length < BATCH) return;
-  }
-}
-
-/**
- * Deletes ready files that no document has used for a week, with their
+ * Deletes files that no document has used for a week, with their
  * objects. Rows go first: a submission attaching one of them meanwhile makes
  * the delete fail on the file link's foreign key rather than lose the file.
  */
@@ -146,8 +107,7 @@ async function deleteUnusedFiles(now: Date): Promise<void> {
     const deleted = await db.execute<{ storageKey: string }>(sql`
       DELETE FROM ${storedFiles} WHERE id IN (
         SELECT file.id FROM ${storedFiles} AS file
-        WHERE file.finalized_at IS NOT NULL
-          AND file.created_at < ${weekAgo}
+        WHERE file.created_at < ${weekAgo}
           AND NOT EXISTS (
             SELECT 1 FROM ${sourceDocumentFiles} AS link
             WHERE link.stored_file_id = file.id
@@ -165,27 +125,6 @@ async function deleteUnusedFiles(now: Date): Promise<void> {
     );
     if (deleted.rows.length < BATCH) return;
   }
-}
-
-/**
- * Deletes objects under `temporary/` last written over a day ago. Finalization
- * removes its own; these are uploads that never finished or whose delete
- * failed. Nothing refers to a temporary object, so age alone decides.
- */
-async function deleteStaleTemporaryObjects(now: Date): Promise<void> {
-  const dayAgo = now.getTime() - DAY_MS;
-  const storage = getS3Storage();
-  let continuationToken: string | null = null;
-  do {
-    const page = await storage.listObjectsPage("temporary/", continuationToken);
-    const stale = page.objects
-      .filter((object) => object.lastModified != null && object.lastModified.getTime() < dayAgo)
-      .map((object) => object.key);
-    await runWithConcurrency(stale, 4, async (key) => {
-      await storage.delete(key);
-    });
-    continuationToken = page.isTruncated ? page.nextContinuationToken : null;
-  } while (continuationToken != null);
 }
 
 /**

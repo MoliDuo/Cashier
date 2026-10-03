@@ -132,7 +132,6 @@ describe("projection write shape", () => {
           storageKey: `tests/${created.sourceDocumentId}/0`,
           contentType: "image/jpeg",
           byteSize: 100,
-          finalizedAt: new Date(),
         })
         .returning()
     )[0];

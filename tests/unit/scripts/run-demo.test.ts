@@ -85,7 +85,6 @@ describe("demo runtime environment", () => {
     expect(result.APP_URL).toBe("http://127.0.0.1:3010");
     expect(result.DATABASE_URL).toContain("127.0.0.1:55440/cashier_demo");
     expect(result.S3_ENDPOINT).toBe("http://127.0.0.1:59010");
-    expect(result.S3_PUBLIC_ENDPOINT).toBe("http://127.0.0.1:59010");
     expect(result.CASHIER_DEMO_POSTGRES_PORT).toBe("55440");
     expect(result.CASHIER_DEMO_S3_PORT).toBe("59010");
   });

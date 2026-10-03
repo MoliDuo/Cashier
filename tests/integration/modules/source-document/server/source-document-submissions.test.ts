@@ -14,7 +14,6 @@ import {
   sourceDocumentFiles,
   extractionAttempts,
   sourceDocuments,
-  storedFiles,
 } from "@/persistence";
 import { ConflictError, ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
@@ -174,21 +173,13 @@ describe("target source-document submissions", () => {
     });
   });
 
-  it("rolls back the document, attempt, and job when evidence is not finalized", async () => {
+  it("rolls back the document, attempt, and job when the evidence is not a stored file", async () => {
     const db = getTestDb();
     await createTestUserWithLedger(db);
-    const [unfinalized] = await db
-      .insert(storedFiles)
-      .values({
-        storageKey: "temporary/unfinalized",
-        contentType: "image/jpeg",
-        byteSize: 1,
-      })
-      .returning();
 
     await expect(
       submitSourceDocument({
-        input: { text: null, storedFileIds: [unfinalized!.id], documentDate: null },
+        input: { text: null, storedFileIds: [crypto.randomUUID()], documentDate: null },
         bookId: await testBookId(db),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });

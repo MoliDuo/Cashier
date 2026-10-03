@@ -20,11 +20,6 @@ export function mapStoredFile(row: typeof storedFiles.$inferSelect): StoredFileC
   };
 }
 
-/** Where the browser puts a pending file's bytes before finalization reads them. */
-export function temporaryKey(storedFileId: string): string {
-  return `temporary/${storedFileId}`;
-}
-
 /** Where a ready file's bytes live. */
 export function durableKey(storedFileId: string): string {
   return `stored/${storedFileId}`;

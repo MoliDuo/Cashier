@@ -9,7 +9,6 @@ export const TEST_STARTUP_ENV = Object.freeze({
   AUTH_RESEND_KEY: "test-resend-key",
   AUTH_EMAIL_FROM: "",
   S3_ENDPOINT: "http://127.0.0.1:1",
-  S3_PUBLIC_ENDPOINT: "",
   S3_REGION: "",
   S3_BUCKET: "cashier-test-images",
   S3_ACCESS_KEY_ID: "test-access-key",

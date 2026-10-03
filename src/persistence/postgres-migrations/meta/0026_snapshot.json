@@ -1,6 +1,6 @@
 {
-  "id": "dab2810c-c5d2-4dcd-a172-b816744cdce2",
-  "prevId": "985d582d-6684-4324-8e32-e6c9f79b5547",
+  "id": "f3645b99-f9fc-42d8-9b92-828871b48f7a",
+  "prevId": "dab2810c-c5d2-4dcd-a172-b816744cdce2",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2436,12 +2436,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "finalized_at": {
-          "name": "finalized_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {

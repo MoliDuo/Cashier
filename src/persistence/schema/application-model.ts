@@ -82,7 +82,6 @@ export const storedFiles = pgTable(
     originalFilename: text("original_filename"),
     checksum: text("checksum"),
     createdAt: rowTimestamp("created_at"),
-    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("uq_stored_files_storage_key").on(table.storageKey),

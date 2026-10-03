@@ -40,7 +40,6 @@ async function storeFile() {
       storageKey: `stored/${crypto.randomUUID()}`,
       contentType: "image/jpeg",
       byteSize: 7,
-      finalizedAt: new Date(),
     })
     .returning();
   return file!.id;

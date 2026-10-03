@@ -43,19 +43,6 @@ export class MemoryObjectStore implements ObjectStore {
     });
   }
 
-  async presignUpload(
-    _key: string,
-    _contentType: string,
-    _sha256: string,
-    _expiresInSeconds: number
-  ): ReturnType<ObjectStore["presignUpload"]> {
-    throw new Error("Unexpected direct upload in proxy storage fixture");
-  }
-
-  async readObject(_key: string): ReturnType<ObjectStore["readObject"]> {
-    throw new Error("Unexpected object inspection in proxy storage fixture");
-  }
-
   async delete(key: string): Promise<{ success: boolean; error?: Error }> {
     this.modifiedAt.delete(key);
     return { success: this.files.delete(key) };

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, exists, isNotNull } from "drizzle-orm";
+import { and, eq, exists } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getS3Storage } from "@/lib/storage/s3";
 import { sourceDocumentFiles, storedFiles } from "@/persistence";
@@ -7,7 +7,7 @@ import { mapStoredFile } from "./shared";
 import type { AuthorizedFileReadContract, StoredFileContract } from "./types";
 
 /**
- * A finalized file some document lists among its inputs. The document link
+ * A file some document lists among its inputs. The document link
  * cascades away with its document, so the link is enough.
  */
 async function findAuthorizedFile(fileId: string) {
@@ -17,7 +17,6 @@ async function findAuthorizedFile(fileId: string) {
     .where(
       and(
         eq(storedFiles.id, fileId),
-        isNotNull(storedFiles.finalizedAt),
         exists(
           db
             .select({ id: sourceDocumentFiles.id })
