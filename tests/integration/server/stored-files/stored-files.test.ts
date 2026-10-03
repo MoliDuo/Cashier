@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { storeProcessedImages, storeUploadedImage } from "@/server/stored-files/uploads";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import {
@@ -36,7 +36,7 @@ function sha256(bytes: Buffer): string {
 }
 
 async function setup(): Promise<MemoryObjectStore> {
-  await createTestUserWithLedger(getTestDb());
+  await createTestLedger(getTestDb());
   const storage = new MemoryObjectStore();
   objectStore.current = storage;
   return storage;

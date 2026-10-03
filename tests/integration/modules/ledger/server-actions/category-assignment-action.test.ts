@@ -25,8 +25,6 @@ vi.mock("@/lib/ai/openai-client", () => ({
   getOpenAIClient: () => ({ generateContent }),
 }));
 
-const userId = "00000000-0000-0000-0000-000000000000";
-
 /** Entries the model can be asked about, each on the live document. */
 async function seedEntries(input: {
   documentId: string;
@@ -80,7 +78,7 @@ async function submitSelection(input: {
 describe("submitSelection", () => {
   beforeEach(() => {
     vi.mocked(getCurrentSession).mockResolvedValue(
-      testSession(userId, { email: "reclassify@example.com" })
+      testSession({ email: "reclassify@example.com" })
     );
     vi.clearAllMocks();
   });

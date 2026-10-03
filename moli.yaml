@@ -21,16 +21,16 @@ release:
 # all rights reserved), so it is left as is.
 exceptions:
   - rule: "8.4.1"
-    reason: One shared ledger with several login emails; users are bound by email by the admin CLI, not by preferred_username
+    reason: One shared ledger and no per-user data, so nothing is keyed by user; the session keeps only the provider-verified email for display, not preferred_username
     until: 2027-03-31
   - rule: "8.5.5"
-    reason: Accounts are bound ahead of time by the admin CLI (scripts/account.ts); first login does not create a user
+    reason: There is no local user table; the session is the identity, and who may sign in is decided by the Authelia client policy
     until: 2027-03-31
   - rule: "10.3.2"
     reason: Existing Postgres database, role and S3 bucket are named "cashier"; renaming needs a data migration
     until: 2027-03-31
   - rule: "10.3.5"
-    reason: One account owns the ledger; ownership is implicit in the book model, there is no per-row owner column
+    reason: The ledger is shared by everyone the Authelia client admits; there is no per-row owner column
     until: 2027-03-31
   - rule: "10.6.1"
     reason: Single-stage image on purpose, it ships tsx and sources so the same image runs migrations and scripts

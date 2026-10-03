@@ -10,12 +10,6 @@ async function archiveBook(page: Page, name: string) {
   await page.getByRole("dialog").getByRole("button", { name: "归档", exact: true }).click();
 }
 
-test("there is no web setup", async ({ page }) => {
-  // Accounts come from `account:create`.
-  const response = await page.goto("/setup");
-  expect(response?.status()).toBe(404);
-});
-
 /**
  * The book switcher and the per-book bookkeeping that replaced the member
  * switch: 总账 is the sum of the books, a record can be filed into a chosen

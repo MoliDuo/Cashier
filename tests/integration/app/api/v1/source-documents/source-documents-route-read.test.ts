@@ -8,7 +8,7 @@ import { GET } from "@/app/api/v1/source-documents/[sourceDocumentId]/route";
 import { getTestDb } from "tests/setup";
 import { drainBackground } from "tests/helpers/background";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
-import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import {
   exchangeRates,
   ledgers,
@@ -84,7 +84,7 @@ describe("API v1 source-documents route", () => {
     mockR2.setUploadError(null);
 
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
 
     credentialKey = `sk_route_${crypto.randomUUID().replace(/-/g, "")}`;
     const { prefix, suffix } = prefixSuffix(credentialKey);

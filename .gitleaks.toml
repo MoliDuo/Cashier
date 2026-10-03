@@ -4,20 +4,8 @@
 useDefault = true
 
 [[allowlists]]
-description = "API documentation and plans: curl examples with placeholder bearer tokens"
-paths = [
-  '''docs/guides/HTTP_API\.md''',
-  '''docs/operations/hash-service-credentials-evidence\.md''',
-  '''docs/superpowers/plans/.*\.md''',
-]
-
-[[allowlists]]
 description = "Test fixtures: made-up tokens, passwords and keys that only exist inside tests"
 paths = [
   '''tests/unit/lib/security/service-credential-token\.test\.ts''',
-  '''tests/unit/scripts/hash-service-credentials\.test\.ts''',
-  '''tests/integration/api/cron-daily-route\.test\.ts''',
-  '''tests/integration/auth/bootstrap-couple\.test\.ts''',
   '''tests/integration/modules/source-document/server/source-document-submissions\.test\.ts''',
-  '''scripts/validate-code-review-proposal\.mjs''',
 ]

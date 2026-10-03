@@ -1,13 +1,10 @@
 import "server-only";
 import { DEV_AUTH_EMAIL, isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
-import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
-import { findUserByEmail } from "./users";
 
 /**
- * Local-dev sign-in. There is one account now, so the dev entry resolves the
- * single seeded dev account; there is no second member to switch to.
+ * Local-dev sign-in: stands in for the identity provider, so it names the
+ * address a session opens for. It returns null anywhere else.
  */
-export async function authenticateDevUser(): Promise<AuthenticatedPrincipal | null> {
-  if (!isDevAuthBypassEnabled()) return null;
-  return (await findUserByEmail(DEV_AUTH_EMAIL)) ?? null;
+export function authenticateDevUser(): string | null {
+  return isDevAuthBypassEnabled() ? DEV_AUTH_EMAIL : null;
 }

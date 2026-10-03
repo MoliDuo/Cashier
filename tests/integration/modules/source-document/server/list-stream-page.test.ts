@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "tests/setup";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import { ledgers } from "@/persistence";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
@@ -27,7 +27,7 @@ describe("listStreamPage", () => {
     duringPageRead.write = null;
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await createTestSourceDocument(db, { status: "completed" });
   });
 

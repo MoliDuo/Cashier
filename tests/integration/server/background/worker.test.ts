@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { extractionAttempts } from "@/persistence";
 import { AppError } from "@/lib/errors";
@@ -24,9 +24,9 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-async function pendingAttempt(userId = crypto.randomUUID()) {
+async function pendingAttempt() {
   const db = getTestDb();
-  await createTestUserWithLedger(db, undefined, undefined, userId);
+  await createTestLedger(db);
   const pending = await createPendingAttempt({
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: await testBookId(db),

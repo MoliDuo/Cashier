@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ledgerEntries, sourceDocuments, storedFiles } from "@/persistence";
 import {
   activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
+  createTestLedger,
   testBookId,
   createTestRecord,
 } from "tests/helpers/schema-setup";
@@ -140,7 +140,7 @@ async function collectLedgerEntryPages(limit: number) {
 describe("bounded target read models", () => {
   it("keeps source-document list and detail reads within fixed query budgets", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const [document] = await db
       .insert(sourceDocuments)
       .values({
@@ -205,7 +205,7 @@ describe("bounded target read models", () => {
 
   it.each([1, 3])("checks ownership for %i stored files with one select", async (fileCount) => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const files = await db
       .insert(storedFiles)
       .values(
@@ -237,7 +237,7 @@ describe("bounded target read models", () => {
 
   it("paginates a large source-document history with a bounded list DTO", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const historySize = 31;
     const sensitiveText = "full-source-text-that-must-not-enter-history";
     const sensitiveUrl = "/api/uploads/private/history-receipt.jpg";
@@ -304,7 +304,7 @@ describe("bounded target read models", () => {
 
   it("paginates a large ledger history without leaking source evidence or internal attempts", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const historySize = 31;
     const sensitiveText = "full-ledger-source-text-that-must-not-enter-list";
     const sensitiveUrl = "/api/uploads/private/ledger-receipt.jpg";

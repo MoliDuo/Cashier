@@ -19,7 +19,7 @@ import { ConflictError, ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
 import {
   createTestBooks,
-  createTestUserWithLedger,
+  createTestLedger,
   testBookId,
   createTestRecord,
 } from "tests/helpers/schema-setup";
@@ -61,7 +61,7 @@ const entry = {
 describe("target source-document submissions", () => {
   it("creates one document, attempt, and job for concurrent user submissions", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const bookId = await testBookId(db);
     const submission = {
       bookId,
@@ -96,7 +96,7 @@ describe("target source-document submissions", () => {
 
   it("refuses a key reused with other content and scopes keys to their sender", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const bookId = await testBookId(db);
     const credentialId = crypto.randomUUID();
     await db.insert(serviceCredentials).values({
@@ -146,7 +146,7 @@ describe("target source-document submissions", () => {
 
   it("atomically creates text, image, and mixed pending attempts with durable intents", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     objectStore.current = new MemoryObjectStore();
     const image = await finalizedFile(Buffer.from("image"));
 
@@ -175,7 +175,7 @@ describe("target source-document submissions", () => {
 
   it("rolls back the document, attempt, and job when the evidence is not a stored file", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
 
     await expect(
       submitSourceDocument({
@@ -194,7 +194,7 @@ describe("target source-document submissions", () => {
     "keeps a first %s failure without ledger entries, open to retry or editing by hand",
     async (failureKind, failureCode) => {
       const db = getTestDb();
-      await createTestUserWithLedger(db);
+      await createTestLedger(db);
       const pending = await submitSourceDocument({
         input: { text: "first parse evidence", storedFileIds: [], documentDate: null },
         bookId: await testBookId(db),
@@ -230,7 +230,7 @@ describe("target source-document submissions", () => {
 
   it("preserves active results across failed/anomalous retries and rejects stale activation", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const active = await createTestRecord(getTestDb(), {
       entries: [entry],
       bookId: await testBookId(db),
@@ -298,7 +298,7 @@ describe("target source-document submissions", () => {
 
   it("inherits immutable evidence on retry and queues only the retry attempt", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     objectStore.current = new MemoryObjectStore();
     const image = await finalizedFile(Buffer.from("image"));
     const initial = await submitSourceDocument({
@@ -339,7 +339,7 @@ describe("target source-document submissions", () => {
 
   it("rejects inherited evidence retry when the document input exceeds MAX_FILES", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     objectStore.current = new MemoryObjectStore();
 
     // Create MAX_FILES + 1 finalized stored files
@@ -387,7 +387,7 @@ describe("target source-document submissions", () => {
 
   it("returns ordered stored-file identities without storage details", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     objectStore.current = new MemoryObjectStore();
     const first = await finalizedFile(Buffer.from("first"));
     const second = await finalizedFile(Buffer.from("second"));
@@ -464,7 +464,7 @@ async function expectNoRecordRows(db: ReturnType<typeof getTestDb>): Promise<voi
 describe("new-record submission against a concurrent archive or ledger delete", () => {
   it("refuses a new record for a book archived before the insert", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const travel = (await createTestBooks(db, ["旅行支出"])).get("旅行支出")!;
     expect(await archiveBook(travel)).toMatchObject({
       status: "archived",
@@ -481,7 +481,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("refuses a new record for a ledger deleted before the insert", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const bookId = await testBookId(db);
     await db.delete(ledgers);
 
@@ -496,7 +496,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("refuses the insert an archive that already holds the ledger lock", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const travel = (await createTestBooks(db, ["旅行支出"])).get("旅行支出")!;
     const pool = racePool();
     const blocker = await pool.connect();
@@ -525,7 +525,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("refuses the insert a ledger delete that already holds the lock", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const bookId = await testBookId(db);
     const pool = racePool();
     const blocker = await pool.connect();
@@ -551,7 +551,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("makes an archive wait for the insert and still retries the existing record", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const travel = (await createTestBooks(db, ["旅行支出"])).get("旅行支出")!;
     const pool = racePool();
     const holder = await pool.connect();
@@ -593,7 +593,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("replays a completed idempotent submission without a second document", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const bookId = await testBookId(db);
     const idempotency = {
       principalType: "user" as const,
@@ -637,7 +637,7 @@ describe("the day a new record is filed under", () => {
 
   it("is the ledger's today while it processes and after its processing fails", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await db.update(ledgers).set({ timeZone: "Asia/Shanghai" });
     // 07:00 in Shanghai is still the previous day in UTC.
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-03-01T23:00:00.000Z") });
@@ -657,7 +657,7 @@ describe("the day a new record is filed under", () => {
 
   it("stays the ledger's today after its processing succeeds", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await db.update(ledgers).set({ timeZone: "Asia/Shanghai" });
     // 07:00 in Shanghai is still the previous day in UTC.
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-03-01T23:00:00.000Z") });
@@ -683,7 +683,7 @@ describe("the day a new record is filed under", () => {
 
   it("is the day the submission asked for, even when processing fails", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const created = await submitSourceDocument({
       bookId: await testBookId(db),
       input: { text: "Breakfast 12", storedFileIds: [], documentDate: "2026-03-02" },

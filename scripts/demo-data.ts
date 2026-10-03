@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DeleteObjectsCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { inArray, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import type { DateOrganizationSuggestion } from "@/lib/ai/date-organization";
@@ -18,7 +18,6 @@ import {
   seedLedger,
   seedServiceCredential,
   seedSourceDocument,
-  seedUser,
   type SeedDatabase,
   type SeedAttempt,
 } from "./lib/seed";
@@ -58,7 +57,6 @@ export interface FixtureCredential {
 }
 
 interface DemoFixture {
-  user: { id: string; email: string };
   ledger: { mainCurrency: string; preferredCurrencies: string[]; aiLanguage: string };
   exchangeRates?: Record<string, string>;
   books: Array<{ id: string; name: string; sortOrder: number }>;
@@ -77,10 +75,6 @@ export interface UploadedImage {
   fileId: string;
   filename: string;
   bytes: Buffer;
-}
-
-interface DemoTarget {
-  user_id: string;
 }
 
 type Environment = Partial<NodeJS.ProcessEnv>;
@@ -102,13 +96,7 @@ const CREDENTIAL_TOKEN_PREFIX = "sk_live_";
  * whose tables may not have the columns the current schema expects.
  */
 const DEMO_RESET_SCHEMAS = { data: "public", migrations: "drizzle" };
-const DEMO_RESET_DATA_TABLES = [
-  "users",
-  "ledgers",
-  "source_documents",
-  "ledger_entries",
-  "stored_files",
-];
+const DEMO_RESET_DATA_TABLES = ["ledgers", "source_documents", "ledger_entries", "stored_files"];
 
 /**
  * Demo tokens keep the app's real format so the seeded rows exercise the same
@@ -147,9 +135,6 @@ export function validateDemoEnvironment(environment: Environment = process.env):
   const storageUrl = requiredUrl("S3_ENDPOINT", environment.S3_ENDPOINT);
   if (!LOOPBACK_HOSTS.has(storageUrl.hostname)) {
     throw new Error("Demo data requires loopback object storage");
-  }
-  if (fixture.user.email !== "dev@cashier.local") {
-    throw new Error("Demo fixture user identity is invalid");
   }
   if (!Array.isArray(fixture.books) || fixture.books.length === 0) {
     throw new Error("Demo fixture must define the books its records belong to");
@@ -248,30 +233,12 @@ export async function resetDemoSchema(environment: Environment = process.env): P
   }
 }
 
-async function findDemoTarget(client: pg.Client): Promise<DemoTarget | null> {
-  // The account is found through its login address.
-  const result = await client.query<DemoTarget>(
-    `SELECT u.id AS user_id
-       FROM users u
-       JOIN login_emails e ON e.user_id = u.id
-      WHERE lower(e.email) = $1
-      LIMIT 1`,
-    [fixture.user.email]
-  );
-  return result.rows[0] ?? null;
-}
-
 interface DemoInspection {
-  target: DemoTarget | null;
   counts: { ledgers: number; documents: number; entries: number; files: number };
   keys: string[];
 }
 
 async function inspectDemoTarget(client: pg.Client): Promise<DemoInspection> {
-  const target = await findDemoTarget(client);
-  if (target == null) {
-    return { target: null, counts: { ledgers: 0, documents: 0, entries: 0, files: 0 }, keys: [] };
-  }
   const counts = await client.query<DemoInspection["counts"]>(
     `SELECT
        (SELECT count(*)::int FROM ledgers) AS ledgers,
@@ -286,7 +253,7 @@ async function inspectDemoTarget(client: pg.Client): Promise<DemoInspection> {
   ).rows.map((row) => row.storage_key);
   const [countRow] = counts.rows;
   if (countRow == null) throw new Error("Demo target counts are missing");
-  return { target, counts: countRow, keys };
+  return { counts: countRow, keys };
 }
 
 function dateSuggestion(
@@ -324,17 +291,13 @@ function requireBookId(bookIds: Map<string, string>, name: string): string {
 export async function insertFixture(
   db: SeedDatabase,
   environment: Environment,
-  {
-    userId,
-    uploadedImages,
-    reset,
-  }: { userId: string; uploadedImages: UploadedImage[]; reset: boolean }
+  { uploadedImages, reset }: { uploadedImages: UploadedImage[]; reset: boolean }
 ): Promise<void> {
   const asOf = anchorDate(environment);
   const now = new Date(`${asOf}T12:00:00.000Z`);
   if (reset) {
-    // The dedicated demo database holds one account and one ledger. A reset
-    // removes both and everything in the ledger, so it restores the fixture
+    // The dedicated demo database holds one ledger. A reset removes it and
+    // everything in it, so it restores the fixture
     // instead of layering onto whatever the last session left behind. A
     // record takes its attempts, entries and file links with it.
     await db.delete(schema.categoryAssignmentJobs);
@@ -345,17 +308,7 @@ export async function insertFixture(
     await db.delete(schema.books);
     await db.delete(schema.ledgerSyncState);
     await db.delete(schema.ledgers);
-    await db.delete(schema.users).where(
-      inArray(
-        schema.users.id,
-        db
-          .select({ id: schema.loginEmails.userId })
-          .from(schema.loginEmails)
-          .where(sql`lower(${schema.loginEmails.email}) = ${fixture.user.email}`)
-      )
-    );
   }
-  await seedUser(db, { id: userId, email: fixture.user.email, at: now });
   await seedLedger(db, {
     aiLanguage: fixture.ledger.aiLanguage,
     preferredCurrencies: fixture.ledger.preferredCurrencies,
@@ -682,11 +635,10 @@ async function runDemoData({
     }
 
     const reset = mode === "reset";
-    const userId = reset || inspection.target == null ? fixture.user.id : inspection.target.user_id;
     const uploadedImages = await uploadFixtureImages(storage, environment);
     await drizzle(client, { schema }).transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${1_536_335_661})`);
-      await insertFixture(tx, environment, { userId, uploadedImages, reset });
+      await insertFixture(tx, environment, { uploadedImages, reset });
     });
 
     const fixtureKeys = new Set(uploadedImages.map((image) => durableKey(image.fileId)));
@@ -718,7 +670,7 @@ async function runDemoData({
         credentials: fixture.serviceCredentials.length,
       })
     );
-    return { status: "complete", userId };
+    return { status: "complete" };
   } finally {
     storage.destroy();
     await client.end();

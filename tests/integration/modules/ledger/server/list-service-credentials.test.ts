@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { books, serviceCredentials } from "@/persistence";
 import {
   createServiceCredential,
@@ -23,7 +23,7 @@ const PUBLISHED_CREDENTIAL_FIELDS = [
 
 describe("listServiceCredentials", () => {
   beforeEach(async () => {
-    await createTestUserWithLedger(getTestDb());
+    await createTestLedger(getTestDb());
   });
 
   it("returns active credentials sorted by newest first and mapped to DTOs", async () => {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { ledgers, serviceCredentials } from "@/persistence";
 import { computeHash, prefixSuffix } from "@/lib/security/service-credential-token";
 import { handleApiV1Route } from "@/server/api-v1/request-pipeline";
@@ -26,7 +26,7 @@ describe("handleApiV1Route", () => {
 
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     credentialKey = `sk_pipeline_${crypto.randomUUID().replace(/-/g, "")}`;
     const { prefix, suffix } = prefixSuffix(credentialKey);
     const [credential] = await db

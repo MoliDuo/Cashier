@@ -91,7 +91,7 @@ describe("SettingsTab account authentication controls", () => {
     queryState.status = "success";
     vi.clearAllMocks();
   });
-  it("lists the login emails and sign-out, but no destructive account mutations", () => {
+  it("shows who is signed in and offers sign-out, but no destructive account mutations", () => {
     const ledger: Ledger = {
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -107,13 +107,11 @@ describe("SettingsTab account authentication controls", () => {
       />
     );
 
-    // Required: the address that signs in, the way to add another, and sign-out.
-    expect(screen.getAllByText("person@example.com").length).toBeGreaterThanOrEqual(1);
+    // Required: the address this session signed in with, and sign-out. Who may
+    // sign in is the identity provider's decision, so there is nothing to manage.
+    expect(screen.getByText("person@example.com")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign out|退出登录/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add email|添加邮箱/i })).toBeInTheDocument();
-    // The only removal is per-address, and it is disabled while one remains:
-    // the account must keep at least one login email.
-    expect(screen.getByRole("button", { name: /移除 person@example\.com/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /添加邮箱|移除/ })).not.toBeInTheDocument();
 
     expect(screen.queryByRole("button", { name: /clear data|清空数据/i })).not.toBeInTheDocument();
     expect(
@@ -139,12 +137,12 @@ describe("SettingsTab account authentication controls", () => {
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent)
     ).toEqual(["主题", "默认折叠账单"]);
-    // One 账户 card: the addresses that sign in, and signing out at its end.
+    // One 账户 card: signing out only, since this session records no address.
     expect(
       within(screen.getByRole("heading", { level: 2, name: "账户" }).closest("section")!)
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent)
-    ).toEqual(["登录邮箱", "在这台设备上退出"]);
+    ).toEqual(["在这台设备上退出"]);
   });
 
   it("clears this device's drafts and remembered book when the reader signs out", async () => {

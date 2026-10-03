@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { updateSourceDocuments } from "@/modules/source-document/server/updates";
@@ -20,7 +20,7 @@ const projectionEntry = {
 describe("current-runtime target adapters", () => {
   it("creates and edits manual projections, and deletes through the aggregate", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const created = await createTestRecord(getTestDb(), {
       title: "Manual",
       entryDate: "2026-07-15",

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { listStreamPage as listStreamPageFor } from "@/modules/source-document/server/list-stream-page";
 import {
@@ -14,7 +14,7 @@ const listStreamPage = () => listStreamPageFor({ limit: 20 });
 
 async function createFixture() {
   const db = getTestDb();
-  await createTestUserWithLedger(db, `date-organization-${crypto.randomUUID()}`);
+  await createTestLedger(db);
   const created = await createTestRecord(getTestDb(), {
     bookId: await testBookId(db),
     title: "Long screenshot",

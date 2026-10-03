@@ -37,8 +37,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate-database.ts",
     "db:studio": "drizzle-kit studio",
-    "account:create": "tsx --conditions=react-server scripts/account.ts create",
-    "account:add-email": "tsx --conditions=react-server scripts/account.ts add-email",
+    "ledger:create": "tsx --conditions=react-server scripts/ledger.ts create",
     "format": "prettier --write .",
     "format:check": "prettier --check --cache ."
   },

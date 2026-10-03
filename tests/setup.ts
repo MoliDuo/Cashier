@@ -4,7 +4,6 @@ import { setTimeout } from "node:timers";
 import { Pool } from "pg";
 import * as schema from "@/persistence";
 import { databaseUrlFor, runDatabaseName } from "../scripts/prepare-test-postgres";
-import { seedUser } from "../scripts/lib/seed";
 import "./setup.common";
 
 const postgresContext = inject("cashierPostgres");
@@ -156,11 +155,6 @@ beforeEach(async () => {
   if (database == null) throw new Error("Test PostgreSQL database is not initialized");
 
   await database.pool.query(EMPTY_ALL_TABLES);
-
-  await seedUser(database.db, {
-    id: "00000000-0000-0000-0000-000000000000",
-    email: "test@example.com",
-  });
 });
 
 vi.mock("@/lib/db", () => ({

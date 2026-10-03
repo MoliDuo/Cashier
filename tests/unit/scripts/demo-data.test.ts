@@ -18,8 +18,8 @@ const previewState = vi.hoisted(() => ({
   s3Sends: 0,
   catalog: {
     public: {
-      tables: ["ledgers", "source_documents", "users"],
-      rows: { users: 1, ledgers: 1, source_documents: 29 },
+      tables: ["ledgers", "source_documents"],
+      rows: { ledgers: 1, source_documents: 29 },
     },
     drizzle: {
       tables: ["__drizzle_migrations"],
@@ -89,8 +89,8 @@ const safeEnvironment = {
 const WRITES = /\b(DROP|CREATE|TRUNCATE|DELETE|INSERT|UPDATE|ALTER|GRANT|VACUUM|REINDEX)\b/i;
 
 const DEFAULT_CATALOG = {
-  public: ["ledgers", "source_documents", "users"],
-  publicRows: { users: 1, ledgers: 1, source_documents: 29 },
+  public: ["ledgers", "source_documents"],
+  publicRows: { ledgers: 1, source_documents: 29 },
   drizzle: ["__drizzle_migrations"],
   drizzleRows: { __drizzle_migrations: 49 },
 } as const;
@@ -273,9 +273,8 @@ describe("demo reset preview", () => {
       schemas: {
         public: {
           exists: true,
-          tables: ["ledgers", "source_documents", "users"],
+          tables: ["ledgers", "source_documents"],
           rows: {
-            users: 1,
             ledgers: 1,
             source_documents: 29,
             ledger_entries: null,
@@ -313,17 +312,16 @@ describe("demo reset preview", () => {
   });
 
   it("describes a database that has not been migrated yet", async () => {
-    catalog.public = { tables: ["users"], rows: { users: 3 } };
+    catalog.public = { tables: ["ledgers"], rows: { ledgers: 3 } };
     catalog.drizzle = { tables: [], rows: {} };
 
     const result = await previewDemoReset(safeEnvironment);
 
     expect(result.schemas.public).toEqual({
       exists: true,
-      tables: ["users"],
+      tables: ["ledgers"],
       rows: {
-        users: 3,
-        ledgers: null,
+        ledgers: 3,
         source_documents: null,
         ledger_entries: null,
         stored_files: null,
@@ -342,7 +340,6 @@ describe("demo reset preview", () => {
       exists: false,
       tables: [],
       rows: {
-        users: null,
         ledgers: null,
         source_documents: null,
         ledger_entries: null,

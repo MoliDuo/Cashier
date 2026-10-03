@@ -1,8 +1,8 @@
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "tests/setup";
-import { createTestUser } from "tests/helpers/schema-setup";
-import { loginEmails, users } from "@/persistence";
+import { createTestLedger } from "tests/helpers/schema-setup";
+import { ledgers } from "@/persistence";
 
 const jar = vi.hoisted(() => new Set<string>());
 
@@ -21,7 +21,7 @@ type PageProps = {
   messageKey: string | null;
   callbackUrl: string;
   devAuthAvailable: boolean;
-  accountMissing: boolean;
+  ledgerMissing: boolean;
 };
 
 async function render(params: Record<string, string> = {}): Promise<PageProps> {
@@ -40,7 +40,7 @@ describe("the login page", () => {
   beforeEach(async () => {
     jar.clear();
     process.env.DEV_AUTH_BYPASS = "false";
-    await createTestUser(getTestDb(), "me@example.com");
+    await createTestLedger(getTestDb());
   });
 
   afterEach(() => {
@@ -57,15 +57,14 @@ describe("the login page", () => {
     );
   });
 
-  it.each(["not_bound", "denied", "failed"])(
-    "stops at %s instead of redirecting again",
-    async (error) => {
-      await expect(render({ error })).resolves.toMatchObject({ messageKey: error });
-    }
-  );
+  it.each(["denied", "failed"])("stops at %s instead of redirecting again", async (error) => {
+    await expect(render({ error })).resolves.toMatchObject({ messageKey: error });
+  });
 
-  it.each(["signed_out", "credentials_changed"])("stops at the %s notice", async (notice) => {
-    await expect(render({ notice })).resolves.toMatchObject({ messageKey: notice });
+  it("stops at the signed-out notice", async () => {
+    await expect(render({ notice: "signed_out" })).resolves.toMatchObject({
+      messageKey: "signed_out",
+    });
   });
 
   it("ignores a message it has no text for", async () => {
@@ -85,11 +84,9 @@ describe("the login page", () => {
     await expect(render()).resolves.toMatchObject({ devAuthAvailable: true, messageKey: null });
   });
 
-  it("explains how to create the account when there is none", async () => {
-    const db = getTestDb();
-    await db.delete(loginEmails);
-    await db.delete(users);
+  it("explains how to create the ledger when there is none", async () => {
+    await getTestDb().delete(ledgers);
 
-    await expect(render()).resolves.toMatchObject({ accountMissing: true, messageKey: null });
+    await expect(render()).resolves.toMatchObject({ ledgerMissing: true, messageKey: null });
   });
 });

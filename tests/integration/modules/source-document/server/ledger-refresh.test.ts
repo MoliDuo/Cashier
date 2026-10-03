@@ -2,12 +2,12 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getStreamRefresh } from "@/modules/source-document/server/stream-refresh";
 import { ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 describe("ledger refresh", () => {
   beforeEach(async () => {
-    await createTestUserWithLedger(getTestDb(), undefined, undefined, crypto.randomUUID());
+    await createTestLedger(getTestDb());
   });
 
   const refresh = (afterVersion: string) => getStreamRefresh({ afterVersion });

@@ -46,7 +46,7 @@ async function getTargetEntryCategoriesAction() {
 }
 
 /**
- * Helper function to create the test ledger for the default test user
+ * Helper function to create the test ledger
  */
 async function createTestLedger(db: ReturnType<typeof getTestDb>) {
   // Clean up any existing ledger to avoid the singleton constraint
@@ -98,7 +98,6 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
     const db = getTestDb();
 
     // Setup: Ledger with category and 3 entries in that category
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const category = await createTestCategory(db);
 
@@ -140,7 +139,6 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
   it("should not affect entries in other categories", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const categoryA = await createTestCategory(db, "餐饮");
     const categoryB = await createTestCategory(db, "交通");
@@ -173,7 +171,6 @@ describe("E1: Create Entry → Data Association Correct", () => {
   it("should correctly associate entry with its category", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const category = await createTestCategory(db);
     const sourceDoc = await createTestSourceDocument(db);
@@ -202,7 +199,6 @@ describe("E1: Create Entry → Data Association Correct", () => {
   it("should create uncategorized entry when no category specified", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const sourceDoc = await createTestSourceDocument(db);
 
@@ -233,7 +229,6 @@ describe("E2: Delete Entry → Related Counts Update", () => {
   it("should decrease category entry count when entry is deleted", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const category = await createTestCategory(db);
 
@@ -256,7 +251,6 @@ describe("E2: Delete Entry → Related Counts Update", () => {
   it("should not affect source document when entry is deleted", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const sourceDoc = await createTestSourceDocument(db);
     const entry = await createTestEntry(db, { sourceDocumentId: sourceDoc.id });
@@ -280,7 +274,6 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
   it("should update both old and new category counts when entry category changes", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const categoryA = await createTestCategory(db, "餐饮");
     const categoryB = await createTestCategory(db, "交通");
@@ -307,7 +300,6 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
   it("should update uncategorized count when entry becomes uncategorized", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const category = await createTestCategory(db);
     const entry = await createTestEntry(db, { categoryId: category.id });
@@ -333,7 +325,6 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
   it("should delete related entries when source document is deleted", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const sourceDoc = await createTestSourceDocument(db);
 
@@ -366,7 +357,6 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
   it("should not affect entries from other source documents", async () => {
     const db = getTestDb();
 
-    // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
     await createTestLedger(db);
     const docA = await createTestSourceDocument(db);
     const docB = await createTestSourceDocument(db);

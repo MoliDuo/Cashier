@@ -5,8 +5,8 @@
 
 ## 1. 设计前提
 
-- **一个账户、一个账本、多个分账。** 账本是单例，分账（books）是用户真正会看到的分区。
-- **一个账户可以挂多个登录邮箱，实际有两个人在用。** "两个人同时编辑同一张票据"是真实会发生的情况，
+- **一个账本、多个分账。** 账本是单例，分账（books）是用户真正会看到的分区。
+- **实际有两个人在用，谁能登录由统一认证决定。** 应用不保存账号。"两个人同时编辑同一张票据"是真实会发生的情况，
   但频率很低。
 - **自建，跑在自己机器的 Docker 里。** 一个常驻的 Node 进程，加 Postgres 和 S3 兼容的对象存储（Versity S3 Gateway），
   前面是自己的反向代理。没有函数寿命、请求体大小或调度频率的平台限制，后台工作由同一个进程里的 worker 和
@@ -62,10 +62,10 @@ src/modules/<m>/          auth、currency、ledger、source-document、stats、w
   hooks/ ui/              客户端代码，一个界面一个组件加一个 hook
 src/server/               跨模块的后台流程：background（worker、调度器、唤醒信号）、processing、
                           category-assignment、maintenance、stored-files、api-v1 请求管线
-src/lib/                  共享基础设施：db（含租约帮手）、s3、ai、email、logger、env、money、format、
+src/lib/                  共享基础设施：db（含租约帮手）、s3、ai、logger、env、money、format、
                           security、drafts、queries 传输层
 src/persistence/          schema（按领域拆文件）和迁移
-src/copy/                 全部界面与邮件文案，按界面区域分文件
+src/copy/                 全部界面文案，按界面区域分文件
 ```
 
 依赖规则：
@@ -105,7 +105,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 | 汇率：`exchange_rates(rate_date, currency, per_eur, …)`                                              | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间                                                       |
 | `stored_files`                                                                                       | 对象存储里文件的登记；先登记行、再写对象，没有任何票据引用的行由每日维护清掉                                                                  |
 | 批量分类：`category_assignment_jobs`、`category_assignment_documents`、`category_assignment_entries` | 租约放在 job 行上，进度在读取时统计；`ai` 任务的候选分类就是 `candidate_snapshot`                                                             |
-| 认证                                                                                                 | `users`、`login_emails`（可以登录的邮箱白名单）、`sessions`                                                                                   |
+| 认证                                                                                                 | `sessions`（已登录的浏览器，只记提供方验证过的邮箱）                                                                                          |
 | API 密钥：`service_credentials`                                                                      | 吊销时写 `revoked_at`，行留作审计                                                                                                             |
 | `ledger_sync_state`（单行）                                                                          | 客户端刷新用的水位线，由行级触发器 `record_ledger_change` 维护：每改一行一条 UPDATE，同一事务复用一个版本号                                   |
 
@@ -147,7 +147,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ## 5. 认证与安全边界
 
-- **身份来自外部的 OIDC 提供方**（Authelia 或任何标准提供方）。应用不保存密码、passkey 或验证码，
+- **身份来自外部的 OIDC 提供方**（Authelia 或任何标准提供方）。应用不保存密码或任何账号，
   只配置三个值：`OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`。回调地址固定为
   `${APP_URL}/auth/callback`，应用不信任请求里的 Host 来构造它。
 - **登录流程**（`src/modules/auth/server/oidc.ts`，授权码加 PKCE）：
@@ -160,16 +160,15 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
     有效期和签发时间（`iat` 与现在相差不超过 5 分钟）；邮箱必须在 ID token 里（提供方的声明策略负责补全），
     不用 userinfo 代替；`email_verified` 明确为 false 时拒绝。请求的 scope 是 `openid profile email groups`。state cookie 每次回调都清掉，
     所以一次授权只能用一次。
-- **谁能用由 `login_emails` 决定。** 回调拿到的邮箱按 `lower()` 匹配 `login_emails`：匹配才创建会话；
-  不匹配就不创建，回到 `/login?error=not_bound`。账号仍是单个共享账号，`login_emails` 是可以登录它的邮箱
-  白名单，要求与提供方那边的用户邮箱一一对应。设置页直接增删邮箱，不再发验证码——能进设置页的人已经通过了
-  提供方；至少保留一个邮箱，删除邮箱会结束该账号的全部会话。
+- **谁能用由提供方决定。** 应用没有自己的用户或名单：通过校验的回调直接创建会话（前提是账本已经存在），
+  能不能走到这一步由提供方对这个客户端的访问策略控制，所以该策略要只放行预期的人。会话里记下提供方验证过的
+  邮箱，只用于在设置页显示是谁登录的。
 - **会话。** 自建 `sessions` 表，cookie `__Host-cashier_session` 里是 32 字节随机令牌（httpOnly、始终 Secure、
   SameSite=Lax、Path=/），库里存它的 HMAC。14 天滑动过期，`last_seen_at` 超过 1 天才续期。用 `getCurrentSession`
   读取，用 `requireAuth` 或 `withAuth`（`src/modules/auth/server/session-guards.ts`）把关，吊销就是删除行。
-  一次查询带出用户和登录邮箱。proxy 只检查 cookie 是否存在，`/api/auth/` 是公开路径。
+  proxy 只检查 cookie 是否存在，`/api/auth/` 是公开路径。
 - **退出。** 只清应用自己的会话，不退出提供方，也不调用提供方的登出端点。退出后落在
-  `/login?notice=signed_out`，这个页面不自动跳转，由用户点"重新登录"；`not_bound`、`failed`、`denied`
+  `/login?notice=signed_out`，这个页面不自动跳转，由用户点"重新登录"；`failed`、`denied`
   这些错误页同样不自动跳转，避免死循环。退出走 `POST /api/auth/logout` 路由，而不是 server action：
   server action 删掉 cookie 后会连同重新渲染的当前页一起返回，那个页面已无会话，会重定向到不带提示的
   `/login`，接着被自动送去提供方、立刻又登录回来，并和随后的整页跳转竞争。路由处理器不触发这次重渲染。
@@ -178,9 +177,8 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   用户点"重新登录"进入 `/api/auth/login` 时清掉它；会话自己过期时没有这个 cookie，仍然自动去提供方续上。
   请求只靠 `SameSite=Lax` 的会话 cookie 识别要退出的会话，跨站的 POST 带不上它，所以不需要额外的来源检查。
 - **dev 旁路。** 开发和测试环境保留受 `isDevAuthBypassEnabled()` 限制的 dev 登录，demo 也靠它。
-- **建账号与找回。** 没有网页 setup。首个账号用 `npm run account:create -- --email <addr>` 在一个事务里
-  建好用户、登录邮箱、账本、默认分账和分类。提供方那边改了邮箱、应用进不去时，用
-  `npm run account:add-email -- --email <addr>` 补一个能登录的邮箱。
+- **建账本。** 没有网页 setup。用 `npm run ledger:create` 在一个事务里建好账本、默认分账和分类；
+  没有账本时登录页会提示这条命令。
 - **没有应用层的登录限流。** 口令校验、多因素和暴力破解防护都在提供方；回调只接受带有效 state、PKCE 和提供方
   签名的授权码。
 - **密钥。** 每一种摘要都用 `deriveKey` / `keyedDigest`（`src/lib/security/keys.ts`），一种用途一把密钥，
@@ -188,7 +186,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 - **API v1 凭证。** 192 位随机值，HMAC 存储，绑定到分账。
 - **日志。** 只记关联 id 和经 `logIdentifier` 标记的标识，邮箱一律哈希。不记原始邮箱、bearer token、
   授权码、令牌、图片内容或服务商负载。
-- 邮件以外的外部调用（汇率、AI、对象存储、OIDC 提供方）放在数据库事务和账本锁之外。一次性和带租约的流程用条件写、
+- 外部调用（汇率、AI、对象存储、OIDC 提供方）放在数据库事务和账本锁之外。一次性和带租约的流程用条件写、
   行锁或 fencing token。
 
 ## 6. 后台运行模型
@@ -288,7 +286,7 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
   深度不在历史里的对话框随之关闭；用别的方式关闭时弹掉自己那一条。对话框开着时应用自己写历史（筛选、周期、
   切换 tab、打开详情）会替换掉这一条而不是叠在上面。状态本来就在网址里的（详情弹层、记账）用
   `closeOnBack={false}` 关掉这层。
-- **读取。** React Query，经 `/api/ledger-queries` 这个会话查询路由，包括页面预取和账户自己的列表；
+- **读取。** React Query，经 `/api/ledger-queries` 这个会话查询路由，包括页面预取；
   各模块的 `queries.ts` 在无类型的 `postLedgerQuery` 传输层上给读取加类型。server action 是串行执行的，
   只用于命令。
 - **写入。** 用集中定义的 query key 和 `useLedgerMutation`。完成后走和刷新同一条路：先重新读一次同步版本，
@@ -356,8 +354,7 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
 - 已有记录的草稿记着它基于的版本，记录被改过时，草稿按冲突拒绝。
 - 只有主动点"取消编辑"时才确认放弃。后退从不被拦下询问，只会关掉最上层的对话框。对话框退出用 Radix 的
   关闭焦点生命周期，不依赖可能永远不触发的 CSS 动画事件。
-- 主动退出登录时清掉本机的全部草稿、记住的分账（`cashier:` 前缀的 key 和分账 cookie），主题保留；
-  会话因登录邮箱变更而结束时草稿留着，回来还能接着写。
+- 主动退出登录时清掉本机的全部草稿、记住的分账（`cashier:` 前缀的 key 和分账 cookie），主题保留。
 
 ### 客户端缓存
 
@@ -373,7 +370,7 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
 
 ### 编辑交互
 
-适用于设置页、账单详情，以及任何"列出一批对象、就地改其中一个"的界面（分账、分类、API 密钥、登录邮箱）。
+适用于设置页、账单详情，以及任何"列出一批对象、就地改其中一个"的界面（分账、分类、API 密钥）。
 约定的是改动在哪里发生、什么时候写库。
 
 1. **单字段就地改，立即生效。** 改一个已存在对象的、行里看得见的单个字段，就在那一行改，回车即写库，
@@ -385,7 +382,7 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
 2. **成组字段用编辑模式加分区级保存 / 取消。** 写库本身是一个事务的一批改动（增删、排序），用一次编辑会话承载，
    未保存的修改存成草稿。编辑期间服务端版本变了，草稿不能覆盖，界面提示"分类已在别处更改"并提供载入最新。
    适用：分类管理。
-3. **弹窗只留给三种事：** 新建尚不存在的对象（新增分账、新建 API 密钥、添加登录邮箱）；
+3. **弹窗只留给三种事：** 新建尚不存在的对象（新增分账、新建 API 密钥）；
    一次性不可再得的信息（新密钥的 token）；行内放不下的多字段编辑（三个及以上字段，或需要图标选择器 / 长文本，
    例如分类的图标 + 名称 + 描述）。
 4. **破坏性动作一律确认。** 删除、归档、退出登录、放弃未保存草稿，全部用 `ConfirmDialog`，`variant="destructive"`。
@@ -393,12 +390,12 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
 新增设置项时按 1 → 2 → 3 的顺序问，前两问任意一个答"是"就不要再往弹窗走。
 
 设置页的分区从设一次就不常动的偏好，排到会越来越长的列表，再到账户：外观、时区与货币、AI 解析、分类、分账、
-API 密钥，最后是账户（登录邮箱，退出登录收尾）。外观、时区与货币、AI 解析都是账本设置，共用一次写库，
+API 密钥，最后是账户（当前登录的邮箱，退出登录收尾）。外观、时区与货币、AI 解析都是账本设置，共用一次写库，
 写库期间三个分区的账本字段一起禁用；主题只存在这台浏览器上，不等写库。新增分区按这个顺序找位置。
 
 编辑入口一律是铅笔图标按钮（`Pencil`、`variant="ghost"`、`size="icon-sm"`），带含对象名的 `aria-label` 和
 `title`。一行最多露出两个动作：常用的铅笔留在行内，排序和退役（**上移 / 下移 / 归档 / 删除**，按这个顺序）收进
-行尾的 `⋮` 菜单，删除用危险色。只有一两个动作的行（登录邮箱只有删除）不用菜单。就地编辑态的动作换成勾和叉，
+行尾的 `⋮` 菜单，删除用危险色。只有一两个动作的行不用菜单。就地编辑态的动作换成勾和叉，
 Enter 等于勾、Esc 等于叉，输入框自动聚焦。
 
 ### 视觉基线
@@ -451,20 +448,16 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
 
 ### 路线图（全部完成）
 
-- **Phase 0：先修的问题。** 分类重算空转、解析截止时间长于函数寿命、会话不过期、OTP 锁定被重发清零等。
+- **Phase 0：先修的问题。** 分类重算空转、解析截止时间长于函数寿命等。
 - **Phase 1：票据模型。** 读时折算、收窄版本协议、合并提取尝试与 outbox。
 - **Phase 2：后台与存储。** 统一租约加每日 cron、上传只留 `stored_files`、改为硬删除。
-- **Phase 3：前端、认证、测试与工具。** 自建会话与 passkey、去掉密码和网页 setup；真实路由、草稿代替离开拦截、
+- **Phase 3：前端、认证、测试与工具。** 真实路由、草稿代替离开拦截、
   设置即时生效、hook 收拢；集成测试模板库、测试目录镜像 `src/`、dependency-cruiser 与 ESLint 取代自制检查器、
   scripts 改 TypeScript、文档收敛。
 - **之后：文案模块。** 去掉 next-intl，文案改为 `src/copy/` 下的普通 TS 模块。只有一种语言，多语言框架带来的
   只有 provider、目录校验和测试 mock；集中存放保留了"一处看全部文案"的好处，类型和跳转由 TS 直接提供。
-- **之后：限流收敛。** 只有两个人用，登录之后的操作（API v1、上传额度）不再限流；登录前的限流集中到
-  `SIGN_IN_RATE_LIMITS` 和 `consumeRateLimit`。按邮箱计数被 60 秒重发冷却覆盖，删掉；汇率刷新不再借用限流表。
-- **之后：统一认证。** 登录交给 OIDC 提供方（Authelia），按邮箱对应 `login_emails`。passkey、邮件验证码、
-  注册链接、邮件发送和登录前的限流整体删除，对应的表由一条迁移丢弃；"限流收敛"那一条随之作废。
 - **之后：数据库整理（迁移 0018）。** 一次发布改完重构留下的误导名字（`revision` 实为提取尝试，
-  `reclassification` 与 `assignment` 混用，`email_change` 实为添加登录邮箱），删掉镜像和没人读的列，
+  `reclassification` 与 `assignment` 混用），删掉镜像和没人读的列，
   收紧类型，删掉约 10 个没有查询在用的索引，同步触发器每行只剩一条 UPDATE。这是 expand/contract 的一次性例外：
   为此把部署改成先构建后迁移，迁移在一个事务里执行，两个人都空闲时推送，旧版本只在迁移的几秒里面对新 schema。
 

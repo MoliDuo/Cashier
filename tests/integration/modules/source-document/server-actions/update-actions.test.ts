@@ -29,12 +29,8 @@ import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
 
 describe("Source Document Update Actions", () => {
-  const testUserId = "00000000-0000-0000-0000-000000000000";
-
   beforeEach(() => {
-    vi.mocked(getCurrentSession).mockResolvedValue(
-      testSession(testUserId, { email: "test@example.com" })
-    );
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession({ email: "test@example.com" }));
   });
 
   describe("batchUpdateSourceDocumentsAction", () => {

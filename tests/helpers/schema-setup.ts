@@ -6,7 +6,6 @@ import {
   seedDocumentFiles,
   seedLedger,
   seedSourceDocument,
-  seedUser,
 } from "../../scripts/lib/seed";
 
 type TestDatabase = NodePgDatabase<typeof schema>;
@@ -15,8 +14,6 @@ type TestDatabase = NodePgDatabase<typeof schema>;
 export function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
-
-export const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 /**
  * Ensures the ledger has books at all. Fixtures that create the ledger by hand
@@ -62,43 +59,10 @@ export async function testBookId(db: TestDatabase): Promise<string> {
   return row.id;
 }
 
-// Helper to create a test user and its login address, returning the user ID.
-export async function createTestUser(
-  db: TestDatabase,
-  email?: string,
-  id = TEST_USER_ID
-): Promise<string> {
-  const finalEmail = email ?? `test-${crypto.randomUUID()}@example.com`;
-
-  const existing = await db
-    .select()
-    .from(schema.users)
-    .where(sql`${schema.users.id} = ${id}`)
-    .limit(1);
-  if (existing.length !== 0) {
-    await db
-      .update(schema.loginEmails)
-      .set({ email: finalEmail })
-      .where(eq(schema.loginEmails.userId, id));
-    return id;
-  }
-
-  return seedUser(db, { id, email: finalEmail });
-}
-
-// Helper to create a test user and ledger together
-export async function createTestUserWithLedger(
-  db: TestDatabase,
-  email?: string,
-  _ledgerName?: string,
-  userId?: string
-): Promise<{ userId: string }> {
-  const finalUserId = await createTestUser(db, email, userId ?? TEST_USER_ID);
-
+/** Creates the ledger and its books, the starting state every fixture builds on. */
+export async function createTestLedger(db: TestDatabase): Promise<void> {
   await seedLedger(db);
   await createTestBooks(db);
-
-  return { userId: finalUserId };
 }
 
 /** One single-byte JPEG stored file per image a fixture names. */

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
-import { DEV_AUTH_EMAIL } from "@/modules/auth/dev-auth";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { SESSION_COOKIE_NAME, SIGNED_OUT_COOKIE_NAME } from "@/modules/auth/constants";
 import { sessions } from "@/persistence";
 
@@ -34,7 +33,7 @@ describe("POST /api/auth/logout", () => {
 
   it("deletes the session and the cookie, and says so", async () => {
     process.env.DEV_AUTH_BYPASS = "true";
-    await createTestUserWithLedger(getTestDb(), DEV_AUTH_EMAIL);
+    await createTestLedger(getTestDb());
     await devSignInAction();
 
     const response = await POST();

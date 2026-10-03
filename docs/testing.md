@@ -101,13 +101,13 @@ advisory lock 和停机交还各有自己的测试；调度器测试用 fake tim
 `tests/smoke/` 用 Playwright 跑在生产构建上，经过真实的浏览器、认证、server action 和 PostgreSQL 边界。
 
 - 每次运行启动临时 PostgreSQL 容器，建一个唯一命名的 `smoke_<uuid>` 库，执行真实迁移，再用
-  `scripts/lib/seed.ts` 写入一个虚构账号、一个账本、两个分账和几个分类。用例需要的账单和会话一样，直接写进这个库。不会迁移、写入或清空任何已有的库。
+  `scripts/lib/seed.ts` 写入一个账本、两个分账和几个分类。用例需要的账单和会话一样，直接写进这个库。不会迁移、写入或清空任何已有的库。
 - 桌面和移动场景串行运行，每个场景用新的浏览器上下文。
 - 没有 dev 旁路，也不连真实的认证服务、AI 或对象存储。认证服务是 `scripts/smoke-oidc-server.ts` 的本地假 OIDC 提供方
   （`OIDC_ISSUER_URL` 指向它）：有 discovery、JWKS、授权、令牌（校验客户端密钥和 PKCE）和 userinfo 端点，
   没有登录表单，由 `POST /__sign-in-as` 指定"当前已登录的用户"。
 - `oidc-sign-in.spec.ts` 走完整的跳转：未登录打开页面自动登录、退出后停在 `/login` 不被登回、
-  未绑定的邮箱和提供方拒绝都停在错误页而不循环；其余用例直接在数据库里为种子账号开一个会话。
+  提供方任意放行的邮箱都能进、提供方拒绝停在错误页而不循环；其余用例直接在数据库里开一个会话。
 - 集成测试用同一个假提供方（`tests/helpers/oidc-provider.ts` 在回环端口上启动它）测 `oidc.ts` 和两个路由：
   state、PKCE、nonce、过期、重放和只有 userinfo 带邮箱的情况。
 - 覆盖账本访问、新建记录、编辑、刷新后仍在、删除、退出登录、受保护页面的跳转，以及新建记录的草稿恢复、

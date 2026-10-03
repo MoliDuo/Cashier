@@ -60,6 +60,7 @@ export const settingsCopy = {
   categoryItemCount: (v: { count: string | number }) => `${v.count} 条明细`,
   uncategorized: "未分类",
   signOut: "退出登录",
+  signedInAs: "当前登录",
   signOutHere: "在这台设备上退出",
   signOutConfirmTitle: "退出登录？",
   signOutConfirmDescription: "退出前会清除本机缓存的账本数据。",
@@ -159,25 +160,6 @@ export const settingsBooksCopy = {
   nameTaken: "已有同名分账。",
   saveFailed: "保存分账失败。",
   empty: "还没有分账。",
-};
-
-export const settingsEmailsCopy = {
-  title: "登录邮箱",
-  add: "添加邮箱",
-  addTitle: "添加登录邮箱",
-  addDesc: "统一登录里邮箱与它相同的用户，就能登录这个账户。",
-  newEmail: "新邮箱地址",
-  addConfirm: "添加",
-  remove: (v: { email: string | number }) => `移除 ${v.email}`,
-  removeTitle: (v: { email: string | number }) => `移除 ${v.email}？`,
-  removeDesc: "该邮箱将不能再登录，账户至少保留一个邮箱。",
-  removeConfirm: "移除",
-  lastEmail: "账户至少要保留一个登录邮箱。",
-  added: "已添加邮箱",
-  sessionsEnded: "邮箱已移除，所有设备均已退出登录。",
-  invalidEmail: "请输入有效的邮箱地址。",
-  emailInUse: "该邮箱已被使用。",
-  unknown: "出了点问题，请重试。",
 };
 
 export const serviceCredentialsCopy = {

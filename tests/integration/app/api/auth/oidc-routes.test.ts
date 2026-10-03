@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { startOidcProviderForTests } from "tests/helpers/oidc-provider";
 import { GET as login } from "@/app/api/auth/login/route";
 import { GET as callback } from "@/app/auth/callback/route";
@@ -81,8 +81,8 @@ describe("GET /api/auth/login", () => {
 });
 
 describe("GET /auth/callback", () => {
-  it("opens a session for a bound address and goes where the visitor was headed", async () => {
-    const { userId } = await createTestUserWithLedger(getTestDb(), "me@example.com");
+  it("opens a session for the address the provider vouched for and goes where the visitor was headed", async () => {
+    await createTestLedger(getTestDb());
     provider.signInAs({ email: "Me@Example.com" });
     const { query, flowCookie } = await comeBack("/entries?tab=all");
 
@@ -90,11 +90,11 @@ describe("GET /auth/callback", () => {
 
     expect(response.headers.get("location")).toBe("http://localhost:3000/entries?tab=all");
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(startSession).toHaveBeenCalledExactlyOnceWith(userId);
+    expect(startSession).toHaveBeenCalledExactlyOnceWith("Me@Example.com");
   });
 
   it("clears the attempt's cookie on the path it was set on, whatever the outcome", async () => {
-    await createTestUserWithLedger(getTestDb(), "me@example.com");
+    await createTestLedger(getTestDb());
     provider.signInAs({ email: "me@example.com" });
     const { query, flowCookie } = await comeBack();
 
@@ -107,14 +107,24 @@ describe("GET /auth/callback", () => {
     );
   });
 
-  it("sends an address nobody bound to the error page without a session", async () => {
-    await createTestUserWithLedger(getTestDb(), "me@example.com");
+  it("lets in any address the provider signs in, with no list of its own to check", async () => {
+    await createTestLedger(getTestDb());
     provider.signInAs({ email: "stranger@example.com" });
     const { query, flowCookie } = await comeBack();
 
     const response = await callback(callbackRequest(query, flowCookie));
 
-    expect(response.headers.get("location")).toBe("http://localhost:3000/login?error=not_bound");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/");
+    expect(startSession).toHaveBeenCalledExactlyOnceWith("stranger@example.com");
+  });
+
+  it("refuses to sign in before the ledger exists", async () => {
+    provider.signInAs({ email: "me@example.com" });
+    const { query, flowCookie } = await comeBack();
+
+    const response = await callback(callbackRequest(query, flowCookie));
+
+    expect(response.headers.get("location")).toBe("http://localhost:3000/login?error=failed");
     expect(startSession).not.toHaveBeenCalled();
   });
 
@@ -130,10 +140,10 @@ describe("GET /auth/callback", () => {
   });
 
   it("maps a failure after the provider answered to the error page", async () => {
-    const { userId } = await createTestUserWithLedger(getTestDb(), "me@example.com");
+    await createTestLedger(getTestDb());
     provider.signInAs({ email: "me@example.com" });
     const { query, flowCookie } = await comeBack();
-    vi.mocked(startSession).mockRejectedValueOnce(new Error(`database down for ${userId}`));
+    vi.mocked(startSession).mockRejectedValueOnce(new Error("database down"));
 
     const response = await callback(callbackRequest(query, flowCookie));
 
@@ -141,7 +151,7 @@ describe("GET /auth/callback", () => {
   });
 
   it("builds the redirect from APP_URL, not from the request's host", async () => {
-    await createTestUserWithLedger(getTestDb(), "me@example.com");
+    await createTestLedger(getTestDb());
     provider.signInAs({ email: "me@example.com" });
     const { query, flowCookie } = await comeBack();
     const request = new NextRequest(`http://attacker.example/auth/callback?${query}`, {

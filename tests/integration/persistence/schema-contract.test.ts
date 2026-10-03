@@ -2,8 +2,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { getTestDb, getTestPool } from "tests/setup";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
-import { extractionAttempts, ledgerSyncState, ledgers, sourceDocuments } from "@/persistence";
+import { createTestLedger, createTestSourceDocument } from "tests/helpers/schema-setup";
+import {
+  extractionAttempts,
+  ledgerSyncState,
+  ledgers,
+  sessions,
+  sourceDocuments,
+} from "@/persistence";
 import * as schema from "@/persistence";
 import { getTableConfig, type AnyPgTable } from "drizzle-orm/pg-core";
 
@@ -137,7 +143,7 @@ describe("PostgreSQL schema contract", () => {
 
   it("keeps a record's latest attempt among its own attempts", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const first = await createTestSourceDocument(db);
     const second = await createTestSourceDocument(db);
     const [otherAttempt] = await db
@@ -203,7 +209,7 @@ describe("PostgreSQL schema contract", () => {
 
   it("keeps a single change-log row", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await createTestSourceDocument(db);
     await expect(db.insert(ledgerSyncState).values({})).rejects.toMatchObject({
       cause: expect.objectContaining({ code: "23505", constraint: "ledger_sync_state_pkey" }),
@@ -309,10 +315,28 @@ describe("PostgreSQL schema contract", () => {
     expect(documentColumns).not.toContain("effective_date");
   });
 
-  it("keeps no passwords, auth versions or setup state", async () => {
-    const userColumns = (await fetchColumns("users")).map((column) => column.columnName);
-    expect(userColumns.sort()).toEqual(["created_at", "id", "updated_at"]);
+  it("keeps no passwords or setup state", async () => {
+    const passwordColumns = await getTestDb().execute<{ table: string; column: string }>(sql`
+      SELECT table_name AS table, column_name AS column
+      FROM information_schema.columns
+      WHERE table_schema = current_schema() AND column_name ILIKE '%password%'
+    `);
+    expect(passwordColumns.rows).toEqual([]);
     expect(await fetchColumns("setup_state")).toEqual([]);
+  });
+
+  it("lets a session be opened with only the provider's address", async () => {
+    // The model no longer names `user_id` or `authenticated_at`; they stay in the
+    // database for the previous release, relaxed so this release can insert
+    // without them. The contract migration that follows drops them.
+    const db = getTestDb();
+    await db.execute(sql`
+      INSERT INTO sessions (token_hash, email, expires_at, last_seen_at)
+      VALUES ('digest', 'someone@example.com', now() + interval '1 day', now())
+    `);
+    expect(await db.select({ email: sessions.email }).from(sessions)).toEqual([
+      { email: "someone@example.com" },
+    ]);
   });
 
   it("checks category names when a statement ends", async () => {
@@ -332,7 +356,7 @@ describe("PostgreSQL schema contract", () => {
 
   it("keeps a single ledger", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await expect(db.insert(ledgers).values({})).rejects.toMatchObject({
       cause: expect.objectContaining({ code: "23505", constraint: "uq_ledgers_singleton" }),
     });
@@ -369,7 +393,13 @@ describe("PostgreSQL schema contract", () => {
 
   it("has no named constraint or index drift from the Drizzle model", async () => {
     // Names a later contract migration drops once the model has let go of them.
-    const retiredNames = new Set<string>();
+    const retiredNames = new Set<string>([
+      "uq_login_emails_email",
+      "idx_login_emails_user_id",
+      "fk_login_emails_user",
+      "fk_sessions_user",
+      "idx_sessions_user_id",
+    ]);
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(

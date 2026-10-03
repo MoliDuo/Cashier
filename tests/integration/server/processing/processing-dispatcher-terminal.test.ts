@@ -2,7 +2,7 @@ import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { LEASE_HEARTBEAT_MS } from "@/config/tuning";
 import { executeProcessingJob } from "@/server/processing/execute-job";
 import { renewProcessingJobLease } from "@/server/processing/jobs";
@@ -26,15 +26,12 @@ afterEach(() => {
 
 /**
  * Creates a pending attempt + job for a single source document.
- * Each call uses a fresh user to avoid unique-constraint collisions
- * when called multiple times within one test.
  */
 async function pendingIntent(
-  requestedAt = "2026-07-15T00:00:00.000Z",
-  userId = crypto.randomUUID()
+  requestedAt = "2026-07-15T00:00:00.000Z"
 ): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  await createTestUserWithLedger(db, undefined, undefined, userId);
+  await createTestLedger(db);
   const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
@@ -56,7 +53,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
   ] as const)("aborts the worker when lease renewal %s", async (_label, mode) => {
     vi.useFakeTimers();
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
 
     let releaseGeneration!: (value: { content: string }) => void;
     let markGenerationStarted!: () => void;
@@ -123,7 +120,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
 
   it("processes successfully, completing the attempt and releasing its claim", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
 
     const generate = vi.fn(async () => ({
       content: JSON.stringify({
@@ -172,7 +169,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
 
   it("does not run a job whose attempt was superseded", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
 
     const generate = vi.fn().mockRejectedValue(new Error("AI service unavailable"));
     vi.mocked(createAIContext).mockReturnValue({ generate });

@@ -8,7 +8,7 @@ import pg from "pg";
 import * as schema from "@/persistence";
 import { migrateDatabase } from "@/persistence/migrate";
 import { createDemoAiServer } from "./demo-ai-server";
-import { seedBooks, seedCategories, seedLedger, seedUser } from "./lib/seed";
+import { seedBooks, seedCategories, seedLedger } from "./lib/seed";
 import { tsxArgs } from "./lib/tsx";
 import { prepareTestPostgres } from "./prepare-test-postgres";
 import { createSmokeOidcServer } from "./smoke-oidc-server";
@@ -91,7 +91,6 @@ async function main(): Promise<void> {
   const oidcClient = { clientId: "cashier-smoke", clientSecret: randomUUID() };
   const oidcServer = createSmokeOidcServer(oidcClient).server;
   const oidcEndpoint = `http://127.0.0.1:${await listenOnAnyPort(oidcServer)}`;
-  const userId = randomUUID();
   const smokeEmail = "smoke@example.com";
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -159,11 +158,9 @@ async function main(): Promise<void> {
     const client = new pg.Client({ connectionString: databaseUrl.toString() });
     await client.connect();
     try {
-      // One account with one login address and one ledger with two books: the
-      // smoke suite signs in as that address, and a record written from 总账
-      // lands in whichever book the writer picked (or the first one, 共同支出).
+      // One ledger with two books: a record written from 总账 lands in whichever
+      // book the writer picked (or the first one, 共同支出).
       const db = drizzle(client, { schema });
-      await seedUser(db, { id: userId, email: smokeEmail });
       await seedLedger(db, { mainCurrency: "CNY" });
       await seedBooks(db, ["共同支出", "旅行支出"]);
       await seedCategories(

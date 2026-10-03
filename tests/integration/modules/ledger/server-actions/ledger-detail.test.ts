@@ -3,18 +3,18 @@ import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
 import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/update";
 import { getTestDb } from "tests/setup";
 import { ledgers } from "@/persistence";
-import { createTestUserWithLedger, TEST_USER_ID } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { NotFoundError } from "@/lib/errors";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 
-// Helper to clean up and create test ledger for current user
+// Helper to clean up and create the test ledger
 async function setupTestLedger(db: ReturnType<typeof getTestDb>) {
   await db.delete(ledgers);
-  await createTestUserWithLedger(db, undefined, undefined, TEST_USER_ID);
+  await createTestLedger(db);
 }
 
 describe("Ledger Actions", () => {
-  it("rejects when the account has no live ledger (Get)", async () => {
+  it("rejects when there is no live ledger (Get)", async () => {
     await expect(getLedgerAction()).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -38,7 +38,7 @@ describe("Ledger Actions", () => {
     expect(result.ledger.settings.currencies).toEqual(["USD", "CNY"]);
   });
 
-  it("rejects when the account has no live ledger (Update)", async () => {
+  it("rejects when there is no live ledger (Update)", async () => {
     await expect(
       updateLedgerSettingsAction({ settings: { mainCurrency: "USD" } })
     ).rejects.toBeInstanceOf(NotFoundError);

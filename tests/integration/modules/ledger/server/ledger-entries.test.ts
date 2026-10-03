@@ -4,9 +4,8 @@ import { getTestDb } from "tests/setup";
 import { ledgers, entryCategories, ledgerEntries } from "@/persistence";
 import {
   activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
+  createTestLedger,
   createTestSourceDocument,
-  TEST_USER_ID,
 } from "tests/helpers/schema-setup";
 
 describe("getLedgerEntriesAction", () => {
@@ -16,9 +15,9 @@ describe("getLedgerEntriesAction", () => {
   beforeEach(async () => {
     const db = getTestDb();
 
-    // Clean up existing ledger for TEST_USER_ID to avoid unique constraint
+    // Clean up the existing ledger to avoid the singleton constraint
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
 
     const [category] = await db
       .insert(entryCategories)

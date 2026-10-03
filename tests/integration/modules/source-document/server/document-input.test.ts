@@ -11,7 +11,7 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 import { splitSourceDocumentAtomically } from "@/modules/source-document/server/split";
@@ -30,7 +30,7 @@ const entry = {
 } as const;
 
 async function newLedger() {
-  await createTestUserWithLedger(getTestDb(), `document-input-${crypto.randomUUID()}`);
+  await createTestLedger(getTestDb());
 }
 
 async function storeFile() {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { listCategories } from "@/modules/ledger/server/categories";
 import { getLedger } from "@/modules/ledger/server/live-ledger";
 import { authenticateServiceCredential } from "@/modules/ledger/server/service-credentials";
@@ -12,7 +12,7 @@ import { insertExchangeRates } from "tests/helpers/exchange-rates";
 describe("current-runtime target adapters", () => {
   it("implements ledger, category, currency, settings, auth, and credential ports", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const bookId = await testBookId(db);
     await db.update(ledgers).set({ mainCurrency: "CNY" });
     await db.insert(entryCategories).values({ name: "Food" });

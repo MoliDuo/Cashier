@@ -1,16 +1,13 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
-import {
-  activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
-} from "tests/helpers/schema-setup";
+import { activateTestSourceDocumentProjection, createTestLedger } from "tests/helpers/schema-setup";
 import { sourceDocuments } from "@/persistence";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
 describe("source-document-queries", () => {
   beforeEach(async () => {
-    await createTestUserWithLedger(getTestDb());
+    await createTestLedger(getTestDb());
   });
 
   it("walks all cursors from start to final null", async () => {

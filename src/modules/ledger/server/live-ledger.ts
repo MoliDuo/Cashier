@@ -6,7 +6,7 @@ import type { LedgerDto } from "@/modules/ledger/contracts";
 import { mapLedgerSettings } from "./settings";
 
 /**
- * The ledger, or null before the account is created. There is exactly one:
+ * The ledger, or null before the ledger is created. There is exactly one:
  * `uq_ledgers_singleton` refuses a second row. Cached per request, so the page
  * boundary, the session check and every action in one render share a single
  * lookup.

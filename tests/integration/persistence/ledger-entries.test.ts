@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { entryCategories as categories, ledgerEntries, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, createTestSourceDocument } from "tests/helpers/schema-setup";
+import { createTestLedger, createTestSourceDocument } from "tests/helpers/schema-setup";
 
 /**
  * FK Constraint Tests for LedgerEntries
@@ -14,7 +14,7 @@ import { createTestUserWithLedger, createTestSourceDocument } from "tests/helper
 describe("LedgerEntries FK Constraints", () => {
   it("should cascade delete ledger entries when their source document is deleted", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db, "test8@example.com", "Test Ledger");
+    await createTestLedger(db);
 
     const sourceDocId = await createTestSourceDocument(db);
 
@@ -39,7 +39,7 @@ describe("LedgerEntries FK Constraints", () => {
 
   it("should set categoryId to null when category is deleted", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db, "test9@example.com", "Test Ledger");
+    await createTestLedger(db);
 
     const [category] = await db
       .insert(categories)

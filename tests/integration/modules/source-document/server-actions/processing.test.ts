@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import { ledgers, extractionAttempts } from "@/persistence";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/server-actions/processing";
@@ -10,7 +10,7 @@ describe("cancelSourceDocumentProcessingAction", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
   });
 
   it("cancels the running parse of the signed-in ledger's document", async () => {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, todayUtc } from "tests/helpers/schema-setup";
+import { createTestLedger, todayUtc } from "tests/helpers/schema-setup";
 import { sourceDocumentFiles, sourceDocuments, storedFiles } from "@/persistence";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
@@ -65,7 +65,7 @@ describe("GET /api/stored-files/[fileId]", () => {
 
   it("serves trusted bytes without exposing the R2 key", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const { file } = await createLinkedStoredFile();
     downloadMock.mockResolvedValue(Buffer.from("bytes"));
 
@@ -81,7 +81,7 @@ describe("GET /api/stored-files/[fileId]", () => {
 
   it("serves a file from the live ledger to the live account", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const { file } = await createLinkedStoredFile();
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
@@ -92,7 +92,7 @@ describe("GET /api/stored-files/[fileId]", () => {
 
   it("returns 404 after the owning source document is deleted", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const { document, file } = await createLinkedStoredFile();
     await db.delete(sourceDocuments).where(eq(sourceDocuments.id, document.id));
 
@@ -104,7 +104,7 @@ describe("GET /api/stored-files/[fileId]", () => {
 
   it("maps missing S3 objects and S3 outages to controlled responses", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const { file } = await createLinkedStoredFile();
 
     downloadMock.mockRejectedValueOnce(new AppError("missing", "FILE_NOT_FOUND", 404));

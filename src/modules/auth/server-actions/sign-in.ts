@@ -11,10 +11,10 @@ export type SignInActionResult = { ok: true } | { ok: false };
 /** Local development only: `authenticateDevUser` returns null anywhere else. */
 export async function devSignInAction(): Promise<SignInActionResult> {
   try {
-    const principal = await authenticateDevUser();
-    if (principal == null) return { ok: false };
-    await completeInteractiveSignIn(principal);
-    await startSession(principal.id);
+    const email = authenticateDevUser();
+    if (email == null) return { ok: false };
+    await completeInteractiveSignIn();
+    await startSession(email);
     return { ok: true };
   } catch (error) {
     logger.error(

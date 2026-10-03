@@ -17,7 +17,7 @@ import { createProcessingAttemptInTransaction } from "@/modules/source-document/
 import { ValidationError } from "@/lib/errors";
 import { MAX_NORMALIZED_BYTES_PER_ATTEMPT, MAX_FILES } from "@/lib/storage/upload-policy";
 import { extractionAttempts, storedFiles } from "@/persistence";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | undefined }));
@@ -33,7 +33,7 @@ describe("upload policy integration", () => {
   describe("aggregate byte overflow at attempt attachment", () => {
     it("rejects attempt attachment when total bytes exceed MAX_NORMALIZED_BYTES_PER_ATTEMPT", async () => {
       const db = getTestDb();
-      await createTestUserWithLedger(db);
+      await createTestLedger(db);
       const bookId = await testBookId(db);
       objectStore.current = new MemoryObjectStore();
 
@@ -70,7 +70,7 @@ describe("upload policy integration", () => {
 
     it("accepts attempt attachment when total bytes are within limit", async () => {
       const db = getTestDb();
-      await createTestUserWithLedger(db);
+      await createTestLedger(db);
       const bookId = await testBookId(db);
       objectStore.current = new MemoryObjectStore();
 
@@ -92,7 +92,7 @@ describe("upload policy integration", () => {
   describe("aggregate file count at attempt boundary", () => {
     it("rejects attempt attachment when file count exceeds MAX_FILES", async () => {
       const db = getTestDb();
-      await createTestUserWithLedger(db);
+      await createTestLedger(db);
       const bookId = await testBookId(db);
       objectStore.current = new MemoryObjectStore();
 
@@ -122,7 +122,7 @@ describe("upload policy integration", () => {
 
     it("accepts attempt attachment at exactly MAX_FILES", async () => {
       const db = getTestDb();
-      await createTestUserWithLedger(db);
+      await createTestLedger(db);
       const bookId = await testBookId(db);
       objectStore.current = new MemoryObjectStore();
 
@@ -146,7 +146,7 @@ describe("upload policy integration", () => {
 
     it("rejects attempt with duplicate stored-file IDs", async () => {
       const db = getTestDb();
-      await createTestUserWithLedger(db);
+      await createTestLedger(db);
       const bookId = await testBookId(db);
       objectStore.current = new MemoryObjectStore();
 
@@ -173,7 +173,7 @@ describe("upload policy integration", () => {
   describe("R2 storage keys are never exposed in responses", () => {
     it("does not return storageKey in stored file query results", async () => {
       const db = getTestDb();
-      await createTestUserWithLedger(db);
+      await createTestLedger(db);
       objectStore.current = new MemoryObjectStore();
 
       const storage = new MemoryObjectStore();

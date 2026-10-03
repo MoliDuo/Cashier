@@ -1,10 +1,7 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
-import {
-  activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
-} from "tests/helpers/schema-setup";
+import { activateTestSourceDocumentProjection, createTestLedger } from "tests/helpers/schema-setup";
 import { entryCategories, ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { eq } from "drizzle-orm";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
@@ -22,7 +19,7 @@ describe("source-document-queries", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
 
     const categories = await db
       .insert(entryCategories)

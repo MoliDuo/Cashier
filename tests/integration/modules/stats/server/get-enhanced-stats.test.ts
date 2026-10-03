@@ -3,10 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { ValidationError } from "@/lib/errors";
 import { getTestDb } from "tests/setup";
-import {
-  activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
-} from "tests/helpers/schema-setup";
+import { activateTestSourceDocumentProjection, createTestLedger } from "tests/helpers/schema-setup";
 import { sourceDocuments, ledgerEntries, entryCategories } from "@/persistence";
 
 function requireFirst<T>(rows: readonly T[], label: string): T {
@@ -67,7 +64,7 @@ describe("Enhanced Stats Actions", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db, undefined, "Test Ledger");
+    await createTestLedger(db);
 
     // Create test categories
     const createdCategory1 = await db

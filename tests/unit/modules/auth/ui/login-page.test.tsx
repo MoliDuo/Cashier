@@ -31,8 +31,6 @@ describe("AuthLoginPage", () => {
 
   it.each([
     ["signed_out", "status", "已退出登录"],
-    ["credentials_changed", "status", "登录邮箱已变更"],
-    ["not_bound", "alert", "这个账号还没有绑定"],
     ["denied", "alert", "登录已取消"],
     ["failed", "alert", "登录没有完成"],
   ] as const)("explains %s and offers to sign in again", (messageKey, role, title) => {
@@ -42,16 +40,16 @@ describe("AuthLoginPage", () => {
     expect(screen.getByRole("link", { name: "重新登录" })).toBeInTheDocument();
   });
 
-  it("tells an instance with no account which command creates one, and offers no sign-in yet", () => {
-    const { unmount } = render(<AuthLoginPage accountMissing />);
+  it("tells an instance with no ledger which command creates one, and offers no sign-in yet", () => {
+    const { unmount } = render(<AuthLoginPage ledgerMissing />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("还没有账户");
-    expect(screen.getByText(/npm run account:create -- --email/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("还没有账本");
+    expect(screen.getByText(/npm run ledger:create/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "登录" })).not.toBeInTheDocument();
     unmount();
 
     render(<AuthLoginPage />);
-    expect(screen.queryByText("还没有账户")).not.toBeInTheDocument();
+    expect(screen.queryByText("还没有账本")).not.toBeInTheDocument();
   });
 
   it("offers exactly one development entry, and only when enabled", () => {

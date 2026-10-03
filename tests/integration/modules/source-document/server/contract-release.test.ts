@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
@@ -21,7 +21,7 @@ const projectionEntry = {
 describe("local contract release", () => {
   it("writes only target attempt, processing, and ledger projections", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const pending = await submitSourceDocument({
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db),
@@ -59,7 +59,7 @@ describe("local contract release", () => {
 
   it("derives a manual document without submission processing state", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const created = await createTestRecord(getTestDb(), {
       inputText: "target attempt text",
       entries: [projectionEntry],

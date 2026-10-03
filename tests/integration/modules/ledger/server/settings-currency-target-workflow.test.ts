@@ -6,7 +6,7 @@ import { updateLedgerSettings } from "@/modules/ledger/server/settings";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { exchangeRates } from "@/persistence/schema/currency";
 import {
-  createTestUserWithLedger,
+  createTestLedger,
   testBookId,
   createTestRecord,
   todayUtc,
@@ -40,7 +40,7 @@ describe("target Settings currency workflow", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await db.update(ledgers).set({ preferredCurrencies: ["CNY", "USD"] });
     await insertExchangeRates("2026-07-15", { CNY: 8, USD: 1 });
   });
@@ -199,7 +199,7 @@ describe("target Settings currency workflow", () => {
 describe("settings concurrency invariants", () => {
   it("concurrent main-currency change and first activateAttempt are serialised by the ledger lock", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db, "settings-race-activate-attempt");
+    await createTestLedger(db);
 
     for (let i = 0; i < 5; i++) {
       // Create a pending attempt first (this creates the document but not the active projection).

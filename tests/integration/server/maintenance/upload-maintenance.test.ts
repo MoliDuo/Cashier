@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ObjectStore } from "@/lib/storage";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { storedFiles } from "@/persistence";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
@@ -15,7 +15,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function seed() {
   const db = getTestDb();
-  await createTestUserWithLedger(db);
+  await createTestLedger(db);
   const storage = new MemoryObjectStore();
   objectStore.current = storage;
   const now = Date.now();

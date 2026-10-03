@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 describe("source-document full query", () => {
   beforeEach(async () => {
-    await createTestUserWithLedger(getTestDb());
+    await createTestLedger(getTestDb());
   });
 
   it("returns full evidence without leaking storage locations", async () => {

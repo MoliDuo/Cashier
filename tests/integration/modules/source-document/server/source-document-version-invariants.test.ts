@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { books, entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { getTestDb } from "tests/setup";
 import {
@@ -49,7 +49,7 @@ const entry = {
 } as const;
 
 async function newLedger() {
-  await createTestUserWithLedger(getTestDb(), `version-invariants-${crypto.randomUUID()}`);
+  await createTestLedger(getTestDb());
 }
 
 async function readDocument(sourceDocumentId: string) {

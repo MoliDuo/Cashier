@@ -46,11 +46,8 @@ describe("splitSourceDocumentAction", () => {
     expect(movedEntries.map((entry) => entry.convertedAmount)).toEqual(["2.50", "2.50"]);
   });
 
-  const userId = "00000000-0000-0000-0000-000000000000";
   beforeEach(() => {
-    vi.mocked(getCurrentSession).mockResolvedValue(
-      testSession(userId, { email: "split@example.com" })
-    );
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession({ email: "split@example.com" }));
   });
 
   async function seed(entryCount = 3) {

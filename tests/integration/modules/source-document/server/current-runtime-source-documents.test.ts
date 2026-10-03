@@ -4,7 +4,7 @@ import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import {
   ledgerEntries,
   sourceDocumentFiles,
@@ -29,7 +29,7 @@ const projectionEntry = {
 describe("current-runtime target adapters", () => {
   it("creates, paginates, and preserves attempt state", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
 
     const first = await createPendingAttempt({
       input: { text: "first", storedFileIds: [], documentDate: null },
@@ -106,7 +106,7 @@ describe("current-runtime target adapters", () => {
 
   it("replaces a reparsed document's entries without leaving the old rows behind", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const bookId = await testBookId(db);
     const first = await createPendingAttempt({
       input: { text: "first", storedFileIds: [], documentDate: null },
@@ -139,7 +139,7 @@ describe("current-runtime target adapters", () => {
 
   it("deletes a document with everything it owns but its stored files, and refuses late completion", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const active = await createTestRecord(getTestDb(), {
       entries: [projectionEntry],
       bookId: await testBookId(db),

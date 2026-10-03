@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { batchUpdateLedgerEntries } from "@/modules/source-document/server/entry-commands";
@@ -11,7 +11,7 @@ afterEach(() => vi.restoreAllMocks());
 
 async function fixture() {
   const db = getTestDb();
-  await createTestUserWithLedger(db);
+  await createTestLedger(db);
   const bookId = await testBookId(db);
   const created = await createTestRecord(getTestDb(), {
     bookId: bookId,

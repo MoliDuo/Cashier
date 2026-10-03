@@ -1,8 +1,8 @@
 /**
- * The one place non-production data is written: the smoke account, the demo
- * workspace and the integration-test fixtures all insert their users, login
- * addresses, the ledger, books, categories, API keys, records and files through
- * these functions, so a schema change has one seed to follow.
+ * The one place non-production data is written: the smoke ledger, the demo
+ * workspace and the integration-test fixtures all insert the ledger, books,
+ * categories, API keys, records and files through these functions, so a schema
+ * change has one seed to follow.
  *
  * Every function takes a drizzle database or transaction and writes only what
  * it is given; the callers decide the ids, names and timestamps. Rows that
@@ -26,20 +26,6 @@ type AttemptFailureKind = (typeof schema.extractionFailureKindEnum.enumValues)[n
 /** Rows written without a time get the moment of the write, as the app's own inserts do. */
 function timestamp(at: Date | undefined): Date {
   return at ?? new Date();
-}
-
-/** An account and its one login address. Returns the user id. */
-export async function seedUser(
-  db: SeedDatabase,
-  input: { id?: string; email: string; at?: Date }
-): Promise<string> {
-  const at = timestamp(input.at);
-  const id = input.id ?? crypto.randomUUID();
-  await db.insert(schema.users).values({ id, createdAt: at, updatedAt: at }).onConflictDoNothing();
-  await db
-    .insert(schema.loginEmails)
-    .values({ userId: id, email: input.email, createdAt: at, updatedAt: at });
-  return id;
 }
 
 /**
