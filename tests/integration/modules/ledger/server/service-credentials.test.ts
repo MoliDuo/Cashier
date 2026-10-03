@@ -10,7 +10,7 @@ import {
   sourceDocuments,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import {
   createServiceCredentialAction,
   deleteServiceCredentialAction,
@@ -75,7 +75,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const db = getTestDb();
 
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "API Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
   });
 
   it("should create and list service credentials via Actions", async () => {

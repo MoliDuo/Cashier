@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { updateMissingCategoryMetadata } from "@/modules/ledger/server/categories";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { entryCategories } from "@/persistence";
 
 describe("category metadata backfill", () => {
   beforeEach(async () => {
-    await createTestUserWithLedger(getTestDb());
+    await createTestLedger(getTestDb());
   });
 
   async function createCategory(

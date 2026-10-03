@@ -8,7 +8,6 @@ import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { createLedgerData, createSourceDocumentData } from "tests/helpers/factories";
 import {
   activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
@@ -24,9 +23,8 @@ function request(query: string, args: unknown[]) {
 }
 
 describe("session ledger query transport", () => {
-  const userId = "00000000-0000-0000-0000-000000000000";
   beforeEach(() => {
-    vi.mocked(getCurrentSession).mockResolvedValue(testSession(userId));
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession());
   });
 
   it("returns private scoped detail", async () => {
@@ -78,7 +76,6 @@ describe("session ledger query transport", () => {
       "settings",
       "source-document-input",
       "convert-currency",
-      "login-emails",
     ]) {
       const response = await POST(request(query, [{ unexpected: true }]));
       expect(response.status).toBe(400);
@@ -176,23 +173,6 @@ describe("session ledger query transport", () => {
       request("convert-currency", [{ amount: "100", from: "CNY", to: "JPY", date: "2026-02-04" }])
     );
     expect(missing.status).toBe(409);
-  });
-
-  it("serves the account's login emails to its own session", async () => {
-    const { userId: ownerId } = await createTestUserWithLedger(
-      getTestDb(),
-      "owner@example.com",
-      undefined,
-      crypto.randomUUID()
-    );
-    vi.mocked(getCurrentSession).mockResolvedValue(testSession(ownerId));
-
-    const emails = await POST(request("login-emails", []));
-    expect(emails.status).toBe(200);
-    expect(await emails.json()).toEqual(["owner@example.com"]);
-
-    vi.mocked(getCurrentSession).mockResolvedValue(null);
-    expect((await POST(request("login-emails", []))).status).toBe(401);
   });
 
   describe("periods", () => {

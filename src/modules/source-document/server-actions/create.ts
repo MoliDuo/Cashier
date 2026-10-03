@@ -16,7 +16,7 @@ import { sourceDocumentFingerprint } from "@/modules/source-document/source-docu
  */
 export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
-    { userId, ledger },
+    { ledger },
     input: CreateSourceDocumentInputContract,
     clientSubmissionId: string
   ): Promise<CreateSourceDocumentResponseDto> => {
@@ -36,8 +36,10 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
       ...(payload.documentDate == null ? {} : { documentDate: payload.documentDate }),
       timeZone: ledger.settings.timeZone,
       idempotency: {
+        // Every signed-in session is the same principal: the client's submission
+        // id is what makes a retry a repeat.
         principalType: "user",
-        principalId: userId,
+        principalId: "web",
         key: validatedClientSubmissionId,
         contentFingerprint: sourceDocumentFingerprint(payload),
       },

@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { claimAttemptForTest, createPendingAttempt } from "tests/helpers/processing-attempt";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import {
   ledgerEntries,
   ledgerSyncState,
@@ -82,7 +82,7 @@ async function readStatementCounter(db: TestDatabase, name: string): Promise<num
 
 describe("projection write shape", () => {
   beforeEach(async () => {
-    await createTestUserWithLedger(getTestDb());
+    await createTestLedger(getTestDb());
   });
 
   it("inserts 1, 50 and 500 projection entries with one statement each", async () => {

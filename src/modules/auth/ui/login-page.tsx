@@ -12,12 +12,12 @@ export function AuthLoginPage({
   messageKey = null,
   callbackUrl = "/",
   devAuthAvailable = false,
-  accountMissing = false,
+  ledgerMissing = false,
 }: {
   messageKey?: LoginMessageKey | null;
   callbackUrl?: string;
   devAuthAvailable?: boolean;
-  accountMissing?: boolean;
+  ledgerMissing?: boolean;
 }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -57,12 +57,12 @@ export function AuthLoginPage({
         </div>
 
         <div className="rounded-lg border border-border bg-surface p-6 shadow-none">
-          {accountMissing ? (
+          {ledgerMissing ? (
             <div role="status" className="mb-5 rounded-md bg-surface2 p-3">
-              <p className={textRoleClassName("bodyStrong")}>{authCopy.noAccountTitle}</p>
-              <p className={textRoleClassName("bodyMuted", "mt-1")}>{authCopy.noAccountDesc}</p>
+              <p className={textRoleClassName("bodyStrong")}>{authCopy.noLedgerTitle}</p>
+              <p className={textRoleClassName("bodyMuted", "mt-1")}>{authCopy.noLedgerDesc}</p>
               <pre className={textRoleClassName("meta", "mt-2 overflow-x-auto text-text")}>
-                <code translate="no">npm run account:create -- --email you@example.com</code>
+                <code translate="no">npm run ledger:create</code>
               </pre>
             </div>
           ) : null}
@@ -80,7 +80,7 @@ export function AuthLoginPage({
               <p className="mt-1">{message.desc}</p>
             </div>
           ) : null}
-          {accountMissing ? null : (
+          {ledgerMissing ? null : (
             // A plain link: the route answers with a redirect to another origin, which a
             // client-side navigation or prefetch must not try to follow.
             <Button asChild className="min-h-11 w-full">

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import {
   archiveBook,
   createBook,
@@ -31,7 +31,7 @@ import { deleteSourceDocumentAtomically } from "@/modules/source-document/server
 describe("books", () => {
   async function fixture() {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const firstBookId = await testBookId(db);
     const created = await createBook({
       name: "梁梁的",

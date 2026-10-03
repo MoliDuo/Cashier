@@ -11,7 +11,7 @@ import {
   ledgers,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { createTestUserWithLedger, TEST_USER_ID, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { createOpenAIMock } from "tests/helpers/mocks/openai";
 
 // Mock OpenAI
@@ -45,9 +45,9 @@ describe("SourceDocument Actions", () => {
 
     const db = getTestDb();
 
-    // Clean up existing ledger for TEST_USER_ID and create new one
+    // Clean up the existing ledger and create a new one
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
 
     const newCat = firstItem(
       await db

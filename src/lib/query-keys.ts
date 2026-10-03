@@ -24,10 +24,6 @@ export const queryKeys = {
     ["ledger", "entries", normalizeQueryParams(params)] as const,
   ledgerEntriesPrefix: () => ["ledger", "entries"] as const,
 
-  // === Login emails ===
-  /** The addresses that can sign in, so an add or remove shows without a reload. */
-  loginEmails: () => ["account", "login-emails"] as const,
-
   // === Books ===
   /** The switcher's books, so a rename or reorder shows without a fresh page. */
   books: () => ["ledger", "books"] as const,

@@ -6,16 +6,9 @@ import { UnauthorizedError } from "@/lib/errors";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 
 export interface AuthenticatedHomeContext {
-  userId: string;
   ledgerDto: LedgerDto;
-  session: {
-    user?: {
-      id: string;
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-    };
-  };
+  /** The address the identity provider vouched for at sign-in, when the session recorded one. */
+  email: string | null;
 }
 
 /**
@@ -27,19 +20,9 @@ export interface AuthenticatedHomeContext {
 export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHomeContext> => {
   const session = await getCurrentSession();
   if (session == null) throw new UnauthorizedError();
-  const userId = session.userId;
 
   const ledger = await getLedger();
   if (ledger == null) throw new UnauthorizedError("Shared ledger is unavailable");
 
-  return {
-    userId,
-    ledgerDto: ledger,
-    session: {
-      user: {
-        id: userId,
-        email: session.email,
-      },
-    },
-  };
+  return { ledgerDto: ledger, email: session.email };
 });

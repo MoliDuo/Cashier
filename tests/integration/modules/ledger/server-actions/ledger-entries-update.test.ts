@@ -5,10 +5,9 @@ import { NotFoundError, ValidationError } from "@/lib/errors";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "tests/setup";
 import {
-  TEST_USER_ID,
   activateTestSourceDocumentProjection,
   createTestSourceDocument,
-  createTestUserWithLedger,
+  createTestLedger,
 } from "tests/helpers/schema-setup";
 
 /**
@@ -20,7 +19,7 @@ import {
 async function seedOwnedEntry() {
   const db = getTestDb();
   await db.delete(ledgers);
-  await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+  await createTestLedger(db);
   const sourceDocumentId = await createTestSourceDocument(db);
   const [entry] = await db
     .insert(ledgerEntries)

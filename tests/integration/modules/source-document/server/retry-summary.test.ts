@@ -2,7 +2,7 @@ import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { describe, expect, it } from "vitest";
 import { createProcessingAttemptInTransaction } from "@/modules/source-document/server/extraction-attempts";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
@@ -87,7 +87,7 @@ async function setupDocumentWithFirstParseFailure(
 describe("retry active result summary", () => {
   it("includes the active result summary for terminal retries", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     for (const failureKind of ["invalid_input", "processing_error"] as const) {
       const { sourceDocumentId } = await setupDocumentWithFailedRetry(db, failureKind);
 
@@ -102,7 +102,7 @@ describe("retry active result summary", () => {
 
   it("omits the active result summary when the failed first parse left no entries", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     for (const failureKind of ["invalid_input", "processing_error"] as const) {
       const { sourceDocumentId } = await setupDocumentWithFirstParseFailure(db, failureKind);
 
@@ -114,7 +114,7 @@ describe("retry active result summary", () => {
 
   it("lets a document whose first parse failed be completed by hand", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const { sourceDocumentId } = await setupDocumentWithFirstParseFailure(db, "processing_error");
     const failed = await getTargetSourceDocument(sourceDocumentId);
     expect(failed).toMatchObject({ processingStatus: "failed", canEdit: true, ledgerEntries: [] });
@@ -139,7 +139,7 @@ describe("retry active result summary", () => {
 
   it("keeps the previous entries when an edit-retry fails while showing its input and failure", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const created = await createTestRecord(getTestDb(), {
       title: "Original",
       entryDate: "2026-07-15",
@@ -192,7 +192,7 @@ describe("retry active result summary", () => {
 
   it("activeResultSummary reflects accurate count and total with multiple entries", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db, "retry-multi-entry");
+    await createTestLedger(db);
 
     // Create a manual document with multiple entries
     const created = await createTestRecord(getTestDb(), {

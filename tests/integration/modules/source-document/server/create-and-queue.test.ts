@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { ledgers, sourceDocuments, storedFiles } from "@/persistence";
 import { createAndQueueSourceDocument } from "@/modules/source-document/server/create-and-queue";
@@ -26,7 +26,7 @@ describe("createAndQueueSourceDocument", () => {
     objectStore.current = storage;
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
   });
 
   it("stores inline images once and files them with the new document", async () => {

@@ -2,7 +2,7 @@ import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
 import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { processingJobs, attemptProcessor } from "tests/helpers/processing-jobs";
@@ -18,15 +18,12 @@ afterEach(() => {
 
 /**
  * Creates a pending attempt + job for a single source document.
- * Each call uses a fresh user to avoid unique-constraint collisions
- * when called multiple times within one test.
  */
 async function pendingIntent(
-  requestedAt = "2026-07-15T00:00:00.000Z",
-  userId = crypto.randomUUID()
+  requestedAt = "2026-07-15T00:00:00.000Z"
 ): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  await createTestUserWithLedger(db, undefined, undefined, userId);
+  await createTestLedger(db);
   const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
@@ -59,7 +56,7 @@ describe("leased processor fencing", () => {
 
   it("does not commit a projection after the worker lease is reclaimed", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
     const { firstToken } = await reclaimedLease(job);
 
     const generate = vi.fn(async () => ({
@@ -108,7 +105,7 @@ describe("leased processor fencing", () => {
 
   it("does not persist a terminal outcome after the worker lease is reclaimed", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
     const { firstToken } = await reclaimedLease(job);
 
     const generate = vi.fn(async () => ({

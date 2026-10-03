@@ -4,10 +4,9 @@ import { getTestDb } from "tests/setup";
 import { ledgerEntries, entryCategories, ledgers } from "@/persistence";
 import { inArray } from "drizzle-orm";
 import {
-  createTestUserWithLedger,
+  createTestLedger,
   createTestSourceDocument,
   activateTestSourceDocumentProjection,
-  TEST_USER_ID,
 } from "tests/helpers/schema-setup";
 
 describe("Batch Update Ledger Entries Action", () => {
@@ -19,7 +18,7 @@ describe("Batch Update Ledger Entries Action", () => {
     const db = getTestDb();
 
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
 
     const [category] = await db
       .insert(entryCategories)

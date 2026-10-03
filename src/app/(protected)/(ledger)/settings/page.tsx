@@ -4,10 +4,10 @@ import { RoutePrefetch, type RouteSearchParams } from "../_route-prefetch";
 import { orSignIn } from "../_sign-in";
 
 export default async function SettingsPage({ searchParams }: { searchParams: RouteSearchParams }) {
-  const { session } = await orSignIn(resolveAuthenticatedHome());
+  const { email } = await orSignIn(resolveAuthenticatedHome());
   return (
     <RoutePrefetch tab="settings" searchParams={searchParams}>
-      <SettingsRoute {...(session.user?.email != null ? { userEmail: session.user.email } : {})} />
+      <SettingsRoute {...(email != null ? { userEmail: email } : {})} />
     </RoutePrefetch>
   );
 }

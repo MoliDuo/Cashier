@@ -4,10 +4,9 @@ import { getTestDb } from "tests/setup";
 import { ledgerEntries, ledgers } from "@/persistence";
 import { eq } from "drizzle-orm";
 import {
-  createTestUserWithLedger,
+  createTestLedger,
   createTestSourceDocument,
   activateTestSourceDocumentProjection,
-  TEST_USER_ID,
 } from "tests/helpers/schema-setup";
 
 describe("Ledger Entry Delete Action", () => {
@@ -16,9 +15,9 @@ describe("Ledger Entry Delete Action", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    // Clean up existing ledger for TEST_USER_ID to avoid unique constraint
+    // Clean up the existing ledger to avoid the singleton constraint
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
 
     // Create a test source document for entries
     testSourceDocId = await createTestSourceDocument(db);

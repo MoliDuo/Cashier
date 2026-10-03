@@ -21,7 +21,7 @@ function sessionTokenHash(token: string): string {
 }
 
 /**
- * Signs the smoke account in by opening a session for it directly.
+ * Signs the smoke address in by opening a session for it directly.
  *
  * A production build compiles `NODE_ENV` in as "production", so the dev
  * sign-in is off here however the server is started. The runner owns the
@@ -34,13 +34,11 @@ export async function signIn(page: Page): Promise<void> {
   const client = new pg.Client({ connectionString: requiredEnv("DATABASE_URL") });
   await client.connect();
   try {
-    const inserted = await client.query(
-      `INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at, authenticated_at)
-       SELECT $1, user_id, now(), now() + interval '1 day', now(), now()
-       FROM login_emails WHERE lower(email) = lower($2)`,
+    await client.query(
+      `INSERT INTO sessions (token_hash, email, created_at, expires_at, last_seen_at)
+       VALUES ($1, $2, now(), now() + interval '1 day', now())`,
       [sessionTokenHash(token), requiredEnv("SMOKE_EMAIL")]
     );
-    if (inserted.rowCount !== 1) throw new Error("The smoke account's login email is not seeded");
   } finally {
     await client.end();
   }

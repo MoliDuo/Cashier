@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import {
   books,
   entryCategories,
@@ -26,7 +26,7 @@ async function syncState() {
 describe("record_ledger_change trigger", () => {
   it("advances the ledger version once per transaction, however many rows change", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const sourceDocumentId = await createTestSourceDocument(db);
     const before = await syncState();
 
@@ -55,7 +55,7 @@ describe("record_ledger_change trigger", () => {
 
   it("moves each watermark only for the changes it covers", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const sourceDocumentId = await createTestSourceDocument(db, { status: "processing" });
 
     const initial = await syncState();
@@ -90,7 +90,7 @@ describe("record_ledger_change trigger", () => {
 
   it("moves the version for a book, an API key and the ledger's zone, not a key's use", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const [book] = await db
       .insert(books)
       .values({ name: "旅行", sortOrder: 9 })
@@ -124,7 +124,7 @@ describe("record_ledger_change trigger", () => {
 
   it("creates the sync row on the first change", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await db.delete(ledgerSyncState);
 
     await createTestSourceDocument(db);

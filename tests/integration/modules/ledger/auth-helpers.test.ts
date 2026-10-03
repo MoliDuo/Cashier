@@ -11,10 +11,8 @@ import { testSession } from "tests/helpers/session";
 import { requireLedgerAccess } from "@/modules/ledger/access";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
-
-function mockSession(userId = TEST_USER_ID, email = "test@example.com") {
-  vi.mocked(getCurrentSession).mockResolvedValue(testSession(userId, { email }));
+function mockSession(email = "test@example.com") {
+  vi.mocked(getCurrentSession).mockResolvedValue(testSession({ email }));
 }
 
 function mockNoSession() {
@@ -35,9 +33,8 @@ describe("requireLedgerAccess", () => {
     await ensureTestLedgerBooks(db);
   });
 
-  it("returns userId and ledger when the ledger exists", async () => {
+  it("returns the ledger when it exists", async () => {
     const result = await requireLedgerAccess();
-    expect(result.userId).toBe(TEST_USER_ID);
     expect(result.ledger.settings).toBeDefined();
   });
 

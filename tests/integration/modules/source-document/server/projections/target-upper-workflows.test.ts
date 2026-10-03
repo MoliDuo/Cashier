@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import { entryCategories, ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { getTestDb } from "tests/setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
@@ -47,7 +47,7 @@ const entry = {
 describe("target upper workflows", () => {
   it("uses persisted list state and paginates without skips", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const completed = await createTestRecord(getTestDb(), {
       entryDate: "2026-07-15",
       entries: [entry],
@@ -91,7 +91,7 @@ describe("target upper workflows", () => {
 
   it("keeps Stream, Details, and Stats on the same active projection", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const [category] = await db.insert(entryCategories).values({ name: "Food" }).returning();
     const created = await createTestRecord(getTestDb(), {
       entryDate: "2026-07-15",
@@ -157,7 +157,7 @@ describe("target upper workflows", () => {
 
   it("preserves decimal adjustments, dates, categories, currencies, and exchange-rate facts atomically", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const [category] = await db.insert(entryCategories).values({ name: "Food" }).returning();
     await insertExchangeRates("2026-07-14", { USD: 1, CNY: 8 });
     const transactionAt = "2026-07-14T12:30:00.000Z";
@@ -256,7 +256,7 @@ describe("target upper workflows", () => {
 
   it("edits a manual entry in place while keeping its id and creating no attempt", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const created = await createTestRecord(getTestDb(), {
       entryDate: "2026-07-15",
       entries: [entry],
@@ -294,7 +294,7 @@ describe("target upper workflows", () => {
 
   it("mutates parsed entries in place with rollback and read consistency", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const pending = await createPendingAttempt({
       input: { text: "Lunch", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db),

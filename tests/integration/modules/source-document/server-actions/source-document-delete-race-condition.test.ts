@@ -3,18 +3,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { ledgers, sourceDocuments } from "@/persistence";
-import {
-  activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
-  TEST_USER_ID,
-} from "tests/helpers/schema-setup";
+import { activateTestSourceDocumentProjection, createTestLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 describe("SourceDocument delete concurrency", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
   });
 
   it("allows only one concurrent delete to commit", async () => {

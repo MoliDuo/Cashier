@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { UnauthorizedError } from "@/lib/errors";
 import {
   activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
+  createTestLedger,
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 
@@ -23,12 +23,8 @@ import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
 
 describe("getSourceDocumentDetailAction", () => {
-  const testUserId = "00000000-0000-0000-0000-000000000000";
-
   beforeEach(() => {
-    vi.mocked(getCurrentSession).mockResolvedValue(
-      testSession(testUserId, { email: "test@example.com" })
-    );
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession({ email: "test@example.com" }));
   });
 
   it("should return source document with basic data", async () => {
@@ -135,7 +131,7 @@ describe("getSourceDocumentDetailAction", () => {
 
   it("validates the document identity and requires a session", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
 
     await expect(getSourceDocumentDetailAction("not-a-uuid")).rejects.toThrow("Validation failed");
     vi.mocked(getCurrentSession).mockResolvedValueOnce(null);

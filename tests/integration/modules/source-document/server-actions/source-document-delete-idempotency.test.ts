@@ -4,18 +4,14 @@ import { NotFoundError } from "@/lib/errors";
 import { eq } from "drizzle-orm";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { ledgers, sourceDocuments } from "@/persistence";
-import {
-  activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
-  TEST_USER_ID,
-} from "tests/helpers/schema-setup";
+import { activateTestSourceDocumentProjection, createTestLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 describe("SourceDocument delete idempotency", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
   });
 
   async function createDocument() {

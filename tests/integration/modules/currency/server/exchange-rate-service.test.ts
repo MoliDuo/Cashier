@@ -9,7 +9,7 @@ import { sourceDocuments } from "@/persistence";
 import { exchangeRates } from "@/persistence/schema/currency";
 import { getTestDb } from "tests/setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 
 function providerResponse(rates: Record<string, Record<string, number>>, base = "EUR") {
   return { ok: true, json: async () => ({ base, rates }) } as Response;
@@ -90,7 +90,7 @@ describe("ensureExchangeRates", () => {
 
   it("tells every ledger to refresh when a day's rates arrive", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const before = await db.query.ledgerSyncState.findFirst();
 
     await insertExchangeRates("2024-01-22", { USD: 1.1 });
@@ -108,7 +108,7 @@ describe("refreshExchangeRates", () => {
 
   it("fills document days, replaces provisional days, and keeps final ones", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     await db.insert(sourceDocuments).values({
       documentDate: "2024-03-05",
       bookId: await testBookId(db),
@@ -157,7 +157,7 @@ describe("refreshExchangeRates", () => {
 
   it("converts entries of a day once refresh fills its rates", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const [document] = await db
       .insert(sourceDocuments)
       .values({ documentDate: "2024-03-05", bookId: await testBookId(db) })

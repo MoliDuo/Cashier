@@ -197,6 +197,13 @@
       "when": 1791002831927,
       "tag": "0027_drop_passkey_and_otp_sign_in",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791003831927,
+      "tag": "0028_sessions_carry_the_provider_email",
+      "breakpoints": true
     }
   ]
 }

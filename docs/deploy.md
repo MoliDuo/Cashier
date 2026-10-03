@@ -44,10 +44,10 @@ Moli Cashier 部署在 Moli 服务器上的 Docker 里，地址 <https://cashier
 4. 登记登录客户端：客户端标识 `moli-cashier`，回调地址 `https://cashier.xiangyu.pro/auth/callback`，授权范围 `openid profile email groups`，并显式指定授权策略。把得到的密钥写进 `.env` 的 `OIDC_CLIENT_SECRET`。
 5. 如果已有一套旧部署，先停掉它，再把旧的数据目录整份复制到 `/data/apps/cashier/data`（数据库和对象存储都在里面），然后核对两边的容器名没有冲突。
 6. 触发部署（见第 3 节）。第一次部署会先执行 `pre-deploy.sh` 备份数据库，再迁移，再启动。
-7. 在账本里创建账号并绑定登录邮箱：
+7. 创建账本：
 
    ```bash
-   docker compose --env-file .tag exec cashier npm run account:create -- --email you@example.com
+   docker compose --env-file .tag exec cashier npm run ledger:create
    ```
 
 ## 3. 日常部署
@@ -95,7 +95,7 @@ docker compose --env-file .tag exec -T postgres pg_restore -U cashier -d cashier
 | 迁移失败，部署回滚                   | 看部署日志里的迁移输出；数据库在失败时保持原样。修好迁移后重新推送。                                        |
 | `/healthz` 返回 503                  | 数据库连不上：看 `docker logs cashier-postgres`，核对 `.env` 里的 `DATABASE_URL` 和密码是否一致。           |
 | 登录后回到登录页                     | 回调地址与登录客户端里登记的不一致，或反向代理没有传 `X-Forwarded-Proto: https`（会话 cookie 要求 HTTPS）。 |
-| 登录页提示邮箱没有绑定               | 认证服务返回的邮箱没有绑定在账本里：在设置页的"登录邮箱"添加，或用 `account:add-email` 兜底。               |
+| 登录页提示还没有账本                 | 第 2 节第 7 步没做：执行 `npm run ledger:create`。                                                          |
 | 图片上传失败                         | 看 `docker logs cashier-s3` 和 `storage-bootstrap` 是否成功创建了存储桶。                                   |
 
 ## 7. 数据导出

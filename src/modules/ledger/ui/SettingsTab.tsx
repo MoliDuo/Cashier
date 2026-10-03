@@ -69,14 +69,8 @@ export function SettingsTab({
   };
 
   const handleSignOut = async () => {
-    // Only a sign-out the reader chose clears the device. A session that ended
-    // for them (a login email was removed) keeps the drafts for when they are back.
     forgetLedgerDataOnThisDevice();
     await signOutTo("/login?notice=signed_out");
-  };
-
-  const handleAllSessionsEnded = async () => {
-    await signOutTo("/login?notice=credentials_changed");
   };
 
   return (
@@ -119,9 +113,6 @@ export function SettingsTab({
 
       <BookSettings />
 
-      {/* Removing a login email deletes every session server-side, so every device
-          was signed out, not only this one; EmailSettings announces that before
-          leaving and then reuses the same credentials-changed sign-out. */}
       <AccountSettings
         {...(userEmail !== undefined ? { userEmail } : {})}
         credentials={credentials}
@@ -134,7 +125,6 @@ export function SettingsTab({
         onDeleteCredential={(id) => deleteCredential.mutateAsync(id)}
         onCredentialDialogClose={createCredential.reset}
         onSignOut={handleSignOut}
-        onAllSessionsEnded={handleAllSessionsEnded}
       />
     </div>
   );

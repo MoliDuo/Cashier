@@ -5,7 +5,7 @@ import { getTestDb } from "tests/setup";
 import {
   activateTestSourceDocumentProjection,
   createTestBooks,
-  createTestUserWithLedger,
+  createTestLedger,
 } from "tests/helpers/schema-setup";
 import {
   entryCategories,
@@ -41,7 +41,7 @@ describe("queryEnhancedStats", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
 
     const insertedCategories = await db
       .insert(entryCategories)

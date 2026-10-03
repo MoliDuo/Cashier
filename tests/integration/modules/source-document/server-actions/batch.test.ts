@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import { createOpenAIMock } from "tests/helpers/mocks/openai";
 import { processAllPendingTasks } from "tests/helpers/processing";
 import { ledgerEntries, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
@@ -27,7 +27,7 @@ describe("source document batch actions", () => {
     );
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
   });
 
   it("deletes each document on its own and reports a missing one under a stable code", async () => {

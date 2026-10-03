@@ -23,11 +23,9 @@ import { computeCategoryCollectionRevision } from "@/modules/ledger/category-col
 vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
 describe("saveEntryCategoriesAction", () => {
-  const userId = "00000000-0000-0000-0000-000000000000";
-
   beforeEach(() => {
     vi.mocked(getCurrentSession).mockResolvedValue(
-      testSession(userId, { email: "category-save@example.com" })
+      testSession({ email: "category-save@example.com" })
     );
   });
 

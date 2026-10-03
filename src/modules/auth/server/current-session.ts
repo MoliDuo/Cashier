@@ -15,11 +15,11 @@ export const getCurrentSession = cache(async (): Promise<SessionUser | null> => 
  * Signs the browser in: replaces the session its cookie named, if any, with a
  * new one. Server actions only, since only they may set cookies.
  */
-export async function startSession(userId: string): Promise<void> {
+export async function startSession(email: string): Promise<void> {
   const jar = await cookies();
   const previous = jar.get(SESSION_COOKIE_NAME)?.value;
   if (previous != null && previous !== "") await deleteSession(previous);
-  const { token, expiresAt } = await createSession(userId);
+  const { token, expiresAt } = await createSession(email);
   jar.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: true,

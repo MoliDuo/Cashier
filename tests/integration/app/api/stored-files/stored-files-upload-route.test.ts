@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import sharp from "sharp";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { MAX_ORIGINAL_BYTES_PER_FILE } from "@/lib/storage/upload-policy";
@@ -34,7 +34,7 @@ describe("POST /api/stored-files", () => {
   let objects: MemoryObjectStore;
 
   beforeEach(async () => {
-    await createTestUserWithLedger(getTestDb());
+    await createTestLedger(getTestDb());
     objects = new MemoryObjectStore();
     storage.current = objects;
   });

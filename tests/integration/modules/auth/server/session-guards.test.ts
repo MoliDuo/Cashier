@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withAuth, requireAuth } from "@/modules/auth/server/session-guards";
+import { requireAuth } from "@/modules/auth/server/session-guards";
 import { withLedgerAccess } from "@/modules/ledger/access";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { testSession } from "tests/helpers/session";
 
 vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
@@ -11,35 +11,6 @@ vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 
 const mockSession = vi.mocked(getCurrentSession);
-
-describe("withAuth", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("throws UnauthorizedError without a session", async () => {
-    mockSession.mockResolvedValue(null);
-
-    const action = withAuth(async (userId) => userId);
-
-    await expect(action()).rejects.toThrow(UnauthorizedError);
-  });
-
-  it("passes the user id and the action's arguments", async () => {
-    mockSession.mockResolvedValue(testSession("user-456"));
-
-    const action = withAuth(async (userId, arg1: string, arg2: number, arg3: boolean) => {
-      return { userId, arg1, arg2, arg3 };
-    });
-
-    await expect(action("hello", 42, true)).resolves.toEqual({
-      userId: "user-456",
-      arg1: "hello",
-      arg2: 42,
-      arg3: true,
-    });
-  });
-});
 
 describe("withLedgerAccess", () => {
   beforeEach(() => {
@@ -49,7 +20,7 @@ describe("withLedgerAccess", () => {
   it("runs the action with its arguments once the ledger exists", async () => {
     const db = getTestDb();
     mockSession.mockResolvedValue(testSession());
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
 
     const action = withLedgerAccess(async (value: string) => value);
 
@@ -63,13 +34,22 @@ describe("withLedgerAccess", () => {
 
     await expect(action()).rejects.toThrow(NotFoundError);
   });
+
+  it("refuses without a session", async () => {
+    mockSession.mockResolvedValue(null);
+
+    const action = withLedgerAccess(async () => "ok");
+
+    await expect(action()).rejects.toThrow(UnauthorizedError);
+  });
 });
 
 describe("requireAuth", () => {
-  it("returns the user id when signed in", async () => {
-    mockSession.mockResolvedValue(testSession("user-789"));
+  it("returns the session when signed in", async () => {
+    const session = testSession({ email: "someone@example.com" });
+    mockSession.mockResolvedValue(session);
 
-    await expect(requireAuth()).resolves.toBe("user-789");
+    await expect(requireAuth()).resolves.toBe(session);
   });
 
   it("throws UnauthorizedError without a session", async () => {

@@ -3,7 +3,7 @@ import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
 import { ledgerEntries, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
 import { ProcessingCancelledError } from "@/modules/source-document/domain/parse/contracts";
@@ -23,15 +23,12 @@ afterEach(() => {
 
 /**
  * Creates a pending attempt + job for a single source document.
- * Each call uses a fresh user to avoid unique-constraint collisions
- * when called multiple times within one test.
  */
 async function pendingIntent(
-  requestedAt = "2026-07-15T00:00:00.000Z",
-  userId = crypto.randomUUID()
+  requestedAt = "2026-07-15T00:00:00.000Z"
 ): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  await createTestUserWithLedger(db, undefined, undefined, userId);
+  await createTestLedger(db);
   const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
@@ -49,7 +46,7 @@ async function pendingIntent(
 describe("processing attempt jobs", () => {
   it("processes parser, reconciliation, exchange-rate facts, and result writes by attempt identity", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
     const generate = vi.fn(async () => ({
       content: JSON.stringify({
         outcome: "success",
@@ -100,7 +97,7 @@ describe("processing attempt jobs", () => {
 
   it("processes with custom ledger prompt in AI generation request", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
 
     // Update typed ledger settings with a custom prompt.
     const customPrompt = "Please categorize expenses as food or transport";
@@ -154,7 +151,7 @@ describe("processing attempt jobs", () => {
   it("retried attempt uses current ledger settings", async () => {
     const db = getTestDb();
     await insertExchangeRates(new Date().toISOString().slice(0, 10), { CNY: 8, USD: 1.2 });
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
 
     // Process once without custom prompt (successful first parse)
     const generate1 = vi.fn(async () => ({
@@ -245,7 +242,7 @@ describe("processing attempt jobs", () => {
 
   it("permits only one concurrent claim", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
     const adapter = processingJobs();
 
     const claims = await Promise.all([adapter.claim(job.attemptId), adapter.claim(job.attemptId)]);
@@ -261,7 +258,7 @@ describe("processing attempt jobs", () => {
   });
 
   it("reclaims an expired lease and fences out the previous holder", async () => {
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
     const adapter = processingJobs();
 
     const first = await adapter.claim(job.attemptId);
@@ -282,7 +279,7 @@ describe("processing attempt jobs", () => {
 
   it("does not hand out a job whose attempt already finished", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
     const adapter = processingJobs();
     await db
       .update(extractionAttempts)
@@ -293,7 +290,7 @@ describe("processing attempt jobs", () => {
   });
 
   it("returns false on duplicate claim", async () => {
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
     const adapter = processingJobs();
 
     // First claim succeeds
@@ -307,7 +304,7 @@ describe("processing attempt jobs", () => {
 
   it("records failed outcome on processing error via executeProcessingJob", async () => {
     const db = getTestDb();
-    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z");
 
     const generate = vi.fn().mockRejectedValue(new Error("AI service unavailable"));
     vi.mocked(createAIContext).mockReturnValue({ generate });

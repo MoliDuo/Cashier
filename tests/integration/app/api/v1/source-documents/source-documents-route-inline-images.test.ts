@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { POST } from "@/app/api/v1/source-documents/route";
 import { getTestDb } from "tests/setup";
-import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import {
   ledgers,
   serviceCredentials,
@@ -80,7 +80,7 @@ describe("API v1 source-documents route", () => {
     mockR2.setUploadError(null);
 
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
+    await createTestLedger(db);
 
     credentialKey = `sk_route_${crypto.randomUUID().replace(/-/g, "")}`;
     const { prefix, suffix } = prefixSuffix(credentialKey);

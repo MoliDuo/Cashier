@@ -2,7 +2,7 @@ import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
 import { sourceDocuments, extractionAttempts } from "@/persistence";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
@@ -19,14 +19,12 @@ import { executeProcessingJob } from "@/server/processing/execute-job";
 
 /**
  * Creates a processing attempt for a single source document.
- * Each call uses a fresh user to avoid unique-constraint collisions.
  */
 async function pendingIntent(
-  requestedAt = "2026-07-15T00:00:00.000Z",
-  userId = crypto.randomUUID()
+  requestedAt = "2026-07-15T00:00:00.000Z"
 ): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  await createTestUserWithLedger(db, undefined, undefined, userId);
+  await createTestLedger(db);
   const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
@@ -292,7 +290,7 @@ describe("Processing Recovery", () => {
 describe("Processing retry supersession", () => {
   it("atomically cancels the old attempt and invalidates its active claim", async () => {
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     const first = await submitSourceDocument({
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db),

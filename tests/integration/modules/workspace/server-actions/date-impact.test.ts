@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import { ledgerEntries, ledgers } from "@/persistence";
 import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/server-actions/date-impact";
 
@@ -8,7 +8,7 @@ describe("previewSourceDocumentDateImpactAction", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
   });
 
   async function documentWithEntries(count: number) {

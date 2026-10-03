@@ -10,7 +10,6 @@ import {
   seedExchangeRates,
   seedLedger,
   seedSourceDocument,
-  seedUser,
 } from "../../../scripts/lib/seed";
 import { getTestDb } from "../../setup";
 
@@ -22,10 +21,9 @@ const fixture = JSON.parse(
 };
 
 describe("seed", () => {
-  it("writes an account, a ledger and a finished record with its files and entries", async () => {
+  it("writes a ledger and a finished record with its files and entries", async () => {
     const db = getTestDb();
     const at = new Date("2026-03-04T12:00:00.000Z");
-    const userId = await seedUser(db, { email: "seed@example.com", at });
     await seedLedger(db, { mainCurrency: "USD", at });
     const books = await seedBooks(db, ["共同支出", "旅行"]);
     const categories = await seedCategories(db, [{ name: "Food", icon: "Utensils" }]);
@@ -51,11 +49,6 @@ describe("seed", () => {
       { currency: "USD", dividend: "7.8", divisor: "7.18" },
     ]);
 
-    const [email] = await db
-      .select()
-      .from(schema.loginEmails)
-      .where(eq(schema.loginEmails.userId, userId));
-    expect(email).toMatchObject({ email: "seed@example.com" });
     const [ledger] = await db.select().from(schema.ledgers);
     expect(ledger).toMatchObject({ mainCurrency: "USD", aiLanguage: "zh-CN" });
     expect(
@@ -121,10 +114,7 @@ describe("seed", () => {
         ? []
         : [{ ...document.image, bytes: Buffer.from(document.image.fileId) }]
     );
-    const workspace = {
-      userId: "10000000-0000-4000-8000-000000000001",
-      uploadedImages: images,
-    };
+    const workspace = { uploadedImages: images };
 
     const environment = { CASHIER_DEMO_AS_OF: "2026-03-04" };
 

@@ -9,13 +9,7 @@ import { getTestMigrationsSchemaName, getTestPool, getTestSchemaName } from "tes
  */
 const WRITES = /\b(DROP|CREATE|TRUNCATE|DELETE|INSERT|UPDATE|ALTER|GRANT|VACUUM|REINDEX)\b/i;
 
-const DATA_TABLES = [
-  "users",
-  "ledgers",
-  "source_documents",
-  "ledger_entries",
-  "stored_files",
-] as const;
+const DATA_TABLES = ["ledgers", "source_documents", "ledger_entries", "stored_files"] as const;
 
 function quoteIdentifier(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
@@ -54,15 +48,8 @@ async function createLegacySchema(
   migrationsSchema: string
 ) {
   await client.query(`
-    CREATE TABLE ${quoteIdentifier(dataSchema)}.users (
-      id uuid PRIMARY KEY,
-      email text NOT NULL,
-      nickname text NOT NULL,
-      gender text NOT NULL
-    );
     CREATE TABLE ${quoteIdentifier(dataSchema)}.ledgers (
-      id uuid PRIMARY KEY,
-      user_id uuid NOT NULL REFERENCES ${quoteIdentifier(dataSchema)}.users(id) ON DELETE cascade
+      id uuid PRIMARY KEY
     );
     CREATE TABLE ${quoteIdentifier(migrationsSchema)}."__drizzle_migrations" (
       id serial PRIMARY KEY,
@@ -111,9 +98,8 @@ describe("demo reset preview against a real database", () => {
       const schema = result.schemas[getTestSchemaName()]!;
       expect(schema.exists).toBe(true);
       for (const table of DATA_TABLES) expect(schema.tables).toContain(table);
-      // Only the seeded account exists at this point in the suite.
+      // Nothing is seeded at this point in the suite.
       expect(schema.rows).toMatchObject({
-        users: 1,
         ledgers: 0,
         source_documents: 0,
         ledger_entries: 0,
@@ -142,10 +128,8 @@ describe("demo reset preview against a real database", () => {
       try {
         await createLegacySchema(setup, dataSchema, migrationsSchema);
         await setup.query(`
-          INSERT INTO "${dataSchema}".users (id, email, nickname, gender)
-          VALUES (gen_random_uuid(), 'a@example.com', 'a', 'male'),
-                 (gen_random_uuid(), 'b@example.com', 'b', 'female'),
-                 (gen_random_uuid(), 'c@example.com', 'c', 'female')
+          INSERT INTO "${dataSchema}".ledgers (id)
+          VALUES (gen_random_uuid()), (gen_random_uuid()), (gen_random_uuid())
         `);
         await setup.query(`
           INSERT INTO "${migrationsSchema}"."__drizzle_migrations" (hash, created_at)
@@ -162,10 +146,9 @@ describe("demo reset preview against a real database", () => {
         // rather than counted, and no column beyond a name is ever read.
         expect(result.schemas[dataSchema]).toEqual({
           exists: true,
-          tables: ["ledgers", "users"],
+          tables: ["ledgers"],
           rows: {
-            users: 3,
-            ledgers: 0,
+            ledgers: 3,
             source_documents: null,
             ledger_entries: null,
             stored_files: null,
@@ -181,7 +164,7 @@ describe("demo reset preview against a real database", () => {
 
         // Read-only in effect as well as in intent: the legacy rows and the
         // migration log are exactly what the fixture wrote.
-        expect(await countRows(setup, dataSchema, "users")).toBe(3);
+        expect(await countRows(setup, dataSchema, "ledgers")).toBe(3);
         expect(await countRows(setup, migrationsSchema, "__drizzle_migrations")).toBe(7);
       } finally {
         setup.release();

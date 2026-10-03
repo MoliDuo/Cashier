@@ -5,9 +5,9 @@ import { authCopy, type LoginMessageKey } from "@/copy/auth";
 import { SIGNED_OUT_COOKIE_NAME } from "@/modules/auth/constants";
 import { isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
 import { sanitizeCallbackPath } from "@/modules/auth/domain/callback-path";
-import { hasAccount } from "@/modules/auth/server/initial-account";
+import { getLedger } from "@/modules/ledger/server/live-ledger";
 
-/** Whether an account exists is read from the database, so nothing is prerendered. */
+/** Whether the ledger exists is read from the database, so nothing is prerendered. */
 export const dynamic = "force-dynamic";
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -30,11 +30,11 @@ export default async function LoginPage({
     [first(params.error), first(params.notice)].find(isMessageKey) ??
     (justSignedOut ? "signed_out" : null);
   const devAuthAvailable = isDevAuthBypassEnabled();
-  const accountMissing = !(await hasAccount());
+  const ledgerMissing = (await getLedger()) == null;
 
   // Someone who just left, or was turned away, is not sent straight back to the
   // provider: it would sign them in again, or loop on the same refusal.
-  if (messageKey == null && !devAuthAvailable && !accountMissing) {
+  if (messageKey == null && !devAuthAvailable && !ledgerMissing) {
     redirect(`/api/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
 
@@ -43,7 +43,7 @@ export default async function LoginPage({
       messageKey={messageKey}
       callbackUrl={callbackUrl}
       devAuthAvailable={devAuthAvailable}
-      accountMissing={accountMissing}
+      ledgerMissing={ledgerMissing}
     />
   );
 }

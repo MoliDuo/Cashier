@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestSourceDocument, createTestLedger } from "tests/helpers/schema-setup";
 import { books, ledgers, sourceDocuments } from "@/persistence";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";
@@ -25,7 +25,7 @@ describe("assignSourceDocumentBookAction", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     documentId = await createTestSourceDocument(db);
     const [target] = await db
       .insert(books)

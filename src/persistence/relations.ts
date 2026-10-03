@@ -1,18 +1,6 @@
 import { relations } from "drizzle-orm";
-import { users, loginEmails } from "./schema/auth";
 import { books, entryCategories, ledgerEntries, serviceCredentials } from "./schema/ledger";
 import { sourceDocuments } from "./schema/source-document";
-
-export const usersRelations = relations(users, ({ many }) => ({
-  loginEmails: many(loginEmails),
-}));
-
-export const loginEmailsRelations = relations(loginEmails, ({ one }) => ({
-  user: one(users, {
-    fields: [loginEmails.userId],
-    references: [users.id],
-  }),
-}));
 
 export const booksRelations = relations(books, ({ many }) => ({
   sourceDocuments: many(sourceDocuments),

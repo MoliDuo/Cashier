@@ -5,17 +5,17 @@ import type {
   CreatedServiceCredentialDto,
   ServiceCredential,
 } from "@/modules/ledger/contracts";
-import { EmailSettings } from "./EmailSettings";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
 import { SettingsField } from "@/components/SettingsField";
 import { SettingsSection } from "@/components/SettingsSection";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { settingsCopy } from "@/copy/settings";
 
 interface AccountSettingsProps {
-  /** The address this session signed in with, for the list's first frame. */
+  /** The address the identity provider vouched for when this session signed in. */
   userEmail?: string;
   credentials: ServiceCredential[];
   isPending: boolean;
@@ -28,8 +28,6 @@ interface AccountSettingsProps {
   onDeleteCredential: (id: string) => Promise<void>;
   onCredentialDialogClose: () => void;
   onSignOut: () => void | Promise<void>;
-  /** Removing a login email ends every session, so each one signs in again. */
-  onAllSessionsEnded: () => void | Promise<void>;
 }
 
 export function AccountSettings({
@@ -42,7 +40,6 @@ export function AccountSettings({
   onDeleteCredential,
   onCredentialDialogClose,
   onSignOut,
-  onAllSessionsEnded,
 }: AccountSettingsProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
@@ -59,14 +56,15 @@ export function AccountSettings({
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}
       />
-      {/* 账户 is who may sign in — the emails — and signing out closes it and the page. */}
+      {/* 账户 shows who is signed in; signing out closes the session and the page. */}
       <SettingsSection title={settingsCopy.account}>
-        <EmailSettings
-          {...(userEmail !== undefined ? { userEmail } : {})}
-          onAllSessionsEnded={onAllSessionsEnded}
-        />
-        {/* The button sits on the heading row at every width, like 添加邮箱,
-            instead of dropping under its own label on a phone. */}
+        {userEmail != null && userEmail !== "" && (
+          <SettingsField title={settingsCopy.signedInAs} stacked>
+            <p className={textRoleClassName("body", "break-all")}>{userEmail}</p>
+          </SettingsField>
+        )}
+        {/* The button sits on the heading row at every width instead of
+            dropping under its own label on a phone. */}
         <SettingsField
           title={settingsCopy.signOutHere}
           stacked

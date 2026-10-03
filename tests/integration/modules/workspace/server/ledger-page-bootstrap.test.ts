@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import type { DehydratedState } from "@tanstack/react-query";
 import { getTestDb } from "tests/setup";
-import {
-  activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
-} from "tests/helpers/schema-setup";
+import { activateTestSourceDocumentProjection, createTestLedger } from "tests/helpers/schema-setup";
 import {
   books,
   categoryAssignmentJobs,
@@ -144,7 +141,7 @@ describe("ledger page bootstrap", () => {
     request.cookies = {};
     request.failBooks = false;
     const db = getTestDb();
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     [bookId] = await db
       .select({ id: books.id })
       .from(books)

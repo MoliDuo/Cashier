@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
@@ -8,7 +8,7 @@ import { getStreamTotal } from "@/modules/source-document/server/stream-total";
 
 describe("ledger search", () => {
   it("normalizes search and keeps Stream and Details contracts independent", async () => {
-    await createTestUserWithLedger(getTestDb());
+    await createTestLedger(getTestDb());
     await createTestRecord(getTestDb(), {
       title: "Coffee Receipt",
       entryDate: "2026-07-15",

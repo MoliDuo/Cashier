@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestLedger, testBookId } from "tests/helpers/schema-setup";
 import { createPendingAttempt, claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { attemptProcessor } from "tests/helpers/processing-jobs";
 import { ledgerEntries, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
@@ -45,7 +45,7 @@ describe("processAttempt", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db);
+    await createTestLedger(db);
     // The day's rates come from the network; here only the day asked for matters.
     ensureRates = vi.spyOn(exchangeRates, "ensureExchangeRates").mockResolvedValue(undefined);
   });

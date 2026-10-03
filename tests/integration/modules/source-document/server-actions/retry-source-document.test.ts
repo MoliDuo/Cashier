@@ -10,7 +10,7 @@ import { NotFoundError, ValidationError } from "@/lib/errors";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { createOpenAIMock } from "tests/helpers/mocks/openai";
 import { processAllPendingTasks } from "tests/helpers/processing";
-import { createTestUserWithLedger, TEST_USER_ID } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import {
   entryCategories,
@@ -35,7 +35,7 @@ describe("source-document retry action", () => {
     );
     const db = getTestDb();
     await db.delete(ledgers);
-    await createTestUserWithLedger(db, undefined, "Retry Ledger", TEST_USER_ID);
+    await createTestLedger(db);
     await db.insert(entryCategories).values({
       name: "餐饮",
       description: "餐饮服务",

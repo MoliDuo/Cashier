@@ -43,7 +43,7 @@ Moli Cashier 会从图片或文字中提取日期、商家、金额、币种、�
 
 ## 安装或访问
 
-- 线上地址：<https://cashier.xiangyu.pro>（需要先由管理员把你的登录邮箱绑定到账本）。
+- 线上地址：<https://cashier.xiangyu.pro>（需要先由管理员在认证服务里放行你的账号）。
 - 想自己跑一份：见 [docs/self-hosting.md](./docs/self-hosting.md)，环境变量见 [docs/configuration.md](./docs/configuration.md)。
 
 先在本地试一试，不碰任何真实服务（需要 Node.js 24 和 Docker）：
@@ -68,7 +68,7 @@ npm run demo:reset -- --apply # 重建 dev@cashier.local 的专用数据
 
 ## 登录方式
 
-通过 Moli 的统一登录（OIDC，Authelia）登录，账号没有密码；认证服务返回的邮箱必须已经绑定在账本的"登录邮箱"里。
+通过 Moli 的统一登录（OIDC，Authelia）登录，应用本身没有账号和密码；谁能登录由认证服务决定。
 本地开发可以设置 `DEV_AUTH_BYPASS=true` 直接以开发身份进入。
 
 ## 部署
@@ -90,19 +90,18 @@ npm run check
 它依次检查格式、架构（dependency-cruiser）与死代码（knip）、lint、类型，跑带覆盖率的全部测试，
 再用隔离的占位配置做一次生产构建并检查受保护路由的包体积。集成测试需要 Docker。
 
-| 命令                        | 用途                                 |
-| --------------------------- | ------------------------------------ |
-| `npm run dev`               | 启动开发服务器                       |
-| `npm run dev:demo`          | 启动独立的 demo 工作区               |
-| `npm run docker:local`      | 启动本地 PostgreSQL 和对象存储       |
-| `npm run docker:down`       | 停止本地基础服务，保留具名卷         |
-| `npm run db:migrate`        | 对当前 `DATABASE_URL` 应用迁移       |
-| `npm run account:create`    | 创建唯一的账号、账本、分账和默认分类 |
-| `npm run account:add-email` | 给唯一的账号再绑定一个登录邮箱       |
-| `npm test`                  | 单元测试                             |
-| `npm run test:all`          | 单元测试和集成测试                   |
-| `npm run test:smoke`        | Playwright 浏览器 smoke 测试         |
-| `npm run check`             | 提交前的完整门禁                     |
+| 命令                    | 用途                           |
+| ----------------------- | ------------------------------ |
+| `npm run dev`           | 启动开发服务器                 |
+| `npm run dev:demo`      | 启动独立的 demo 工作区         |
+| `npm run docker:local`  | 启动本地 PostgreSQL 和对象存储 |
+| `npm run docker:down`   | 停止本地基础服务，保留具名卷   |
+| `npm run db:migrate`    | 对当前 `DATABASE_URL` 应用迁移 |
+| `npm run ledger:create` | 创建账本、分账和默认分类       |
+| `npm test`              | 单元测试                       |
+| `npm run test:all`      | 单元测试和集成测试             |
+| `npm run test:smoke`    | Playwright 浏览器 smoke 测试   |
+| `npm run check`         | 提交前的完整门禁               |
 
 ## 许可
 

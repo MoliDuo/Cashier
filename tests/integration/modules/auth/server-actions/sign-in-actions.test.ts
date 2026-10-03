@@ -3,7 +3,7 @@ import { getTestDb } from "tests/setup";
 import { sessions } from "@/persistence";
 import { DEV_AUTH_EMAIL } from "@/modules/auth/dev-auth";
 import { SESSION_COOKIE_NAME } from "@/modules/auth/constants";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestLedger } from "tests/helpers/schema-setup";
 
 const jar = vi.hoisted(() => new Map<string, string>());
 
@@ -32,20 +32,20 @@ describe("sign-in actions", () => {
     else process.env.DEV_AUTH_BYPASS = originalBypass;
   });
 
-  it("signs in as the dev account, and the cookie then names the session", async () => {
+  it("signs in as the dev address, and the cookie then names the session", async () => {
     process.env.DEV_AUTH_BYPASS = "true";
-    const { userId } = await createTestUserWithLedger(getTestDb(), DEV_AUTH_EMAIL);
+    await createTestLedger(getTestDb());
 
     await expect(devSignInAction()).resolves.toEqual({ ok: true });
 
     expect(jar.get(SESSION_COOKIE_NAME)).toMatch(/^[\w-]{43}$/);
-    await expect(getCurrentSession()).resolves.toMatchObject({ userId, email: DEV_AUTH_EMAIL });
-    await expect(requireAuth()).resolves.toBe(userId);
+    await expect(getCurrentSession()).resolves.toMatchObject({ email: DEV_AUTH_EMAIL });
+    await expect(requireAuth()).resolves.toMatchObject({ email: DEV_AUTH_EMAIL });
   });
 
   it("replaces the browser's previous session when it signs in again", async () => {
     process.env.DEV_AUTH_BYPASS = "true";
-    await createTestUserWithLedger(getTestDb(), DEV_AUTH_EMAIL);
+    await createTestLedger(getTestDb());
 
     await devSignInAction();
     const first = jar.get(SESSION_COOKIE_NAME);
@@ -57,7 +57,7 @@ describe("sign-in actions", () => {
 
   it("refuses the dev sign-in when the bypass is off", async () => {
     process.env.DEV_AUTH_BYPASS = "false";
-    await createTestUserWithLedger(getTestDb(), DEV_AUTH_EMAIL);
+    await createTestLedger(getTestDb());
 
     await expect(devSignInAction()).resolves.toEqual({ ok: false });
     expect(jar.has(SESSION_COOKIE_NAME)).toBe(false);

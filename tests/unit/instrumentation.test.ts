@@ -36,7 +36,7 @@ describe("instrumentation.register", () => {
 
     expect(validateStartupEnv).toHaveBeenCalledTimes(1);
     expect(startBackgroundRuntime).not.toHaveBeenCalled();
-    // Accounts come from `account:create`; boot prints no codes or links.
+    // The ledger comes from `ledger:create`; boot prints no codes or links.
     expect(logger.warn).not.toHaveBeenCalled();
   });
 

@@ -39,16 +39,17 @@ Postgres 和对象存储只在 compose 的内部网络里，不占用宿主机�
 所以数据目录的一个快照就是完整备份。数据目录所在的文件系统需要支持扩展属性（ext4、XFS、ZFS 都支持）。
 没有用 MinIO，是因为它不再发布社区版镜像，`quay.io/minio` 上的旧镜像已经拉取不到。
 
-创建账号和注册链接（命令在应用容器里执行，读取容器自己的环境变量）：
+创建账本（命令在应用容器里执行，读取容器自己的环境变量）：
 
 ```bash
-docker compose exec cashier npm run account:create -- --email you@example.com
+docker compose exec cashier npm run ledger:create
 ```
 
 ### 登录（OIDC）
 
 Moli Cashier 通过 OIDC 授权码流程（带 PKCE）登录，认证服务可以是 Authelia 或任何标准的 OIDC 提供方。
-认证服务里用户的邮箱与 Moli Cashier 的"登录邮箱"一一对应：提供方返回的邮箱没有绑定在 Moli Cashier 里，就不能使用。
+谁能登录完全由认证服务决定：Moli Cashier 没有自己的账号或名单，任何通过认证并被这个客户端放行的人都能使用同一个账本，
+所以要在认证服务里把访问限制在预期的用户上。
 没有本地会话时，Moli Cashier 直接跳到认证服务；认证服务里已经登录时，用户只会看到一次很快的跳转。
 退出登录只清除 Moli Cashier 自己的会话，不会退出认证服务，并停在不自动跳转的登录页。
 
@@ -62,7 +63,7 @@ identity_providers:
         client_name: Moli Cashier
         client_secret: "$pbkdf2-sha512$…"
         public: false
-        authorization_policy: one_factor
+        authorization_policy: moli_cashier_users # 只放行预期用户的自定义策略，不要用对所有人开放的策略
         consent_mode: implicit
         redirect_uris:
           - https://cashier.example.com/auth/callback
@@ -73,15 +74,6 @@ identity_providers:
 ```
 
 `OIDC_ISSUER_URL` 是 Authelia 的公开地址（例如 `https://auth.example.com`）。邮箱必须在 ID token 的 `email` 里（不再读 userinfo），ID token 只接受 RS256 签名，`iat` 与当前时间相差超过 5 分钟的会被拒绝；提供方标明 `email_verified` 为 false 的邮箱会被拒绝。
-
-**从旧的通行密钥 / 邮件验证码登录升级前**，先确认 Moli Cashier 设置页里的登录邮箱与认证服务里的用户邮箱一致，
-否则升级后没有人能登录。万一已经锁在外面，在服务器上补一个邮箱：
-
-```bash
-docker compose exec cashier npm run account:add-email -- --email you@example.com
-```
-
-升级会删除通行密钥、验证码和限流相关的表，迁移前请先备份。
 
 ### 反向代理
 
@@ -152,21 +144,17 @@ npm run db:migrate
 npm run dev
 ```
 
-账号、账本和分账不在环境变量或网页向导里配置，而是用本地命令创建：
+账本和分账不在环境变量或网页向导里配置，而是用本地命令创建：
 
 ```bash
-npm run account:create -- --email you@example.com
-npm run account:add-email -- --email other@example.com
+npm run ledger:create
 ```
 
-- `account:create` 在一个事务里创建账号、登录邮箱、账本、分账（默认 `共同支出`，可用 `--book`
-  多次指定）和默认分类；已有账号或邮箱已被使用时拒绝执行。
-- `account:add-email` 给唯一的账号再绑定一个登录邮箱。平时在设置页的"登录邮箱"里增删即可；只有在认证服务里
-  改了邮箱、导致没有人能登录时，才需要用这个命令兜底。
+`ledger:create` 在一个事务里创建账本、分账（默认 `共同支出`，可用 `--book` 多次指定）和默认分类；已有账本时拒绝执行。
 
-账号没有密码，登录完全交给认证服务（见下面的"登录（OIDC）"）。本地开发可以设置 `DEV_AUTH_BYPASS=true`，
+应用没有账号和密码，登录完全交给认证服务（见下面的"登录（OIDC）"）。本地开发可以设置 `DEV_AUTH_BYPASS=true`，
 在登录页直接以开发身份进入。
 
-两个命令读取 `DATABASE_URL`（环境变量，或项目根目录的 `.env.local` / `.env`）。
+该命令读取 `DATABASE_URL`（环境变量，或项目根目录的 `.env.local` / `.env`）。
 
 不要提交 `.env`、服务商凭证、真实票据、API 密钥或原始个人数据。

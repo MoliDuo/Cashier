@@ -17,7 +17,7 @@ test.describe("sign-in through the identity provider", () => {
   test.skip(({ isMobile }) => isMobile, "one provider user at a time");
   test.afterEach(() => providerSignsIn(null));
 
-  test("opening a page signs a bound address in with no click, and signing out stays out", async ({
+  test("opening a page signs the provider's user in with no click, and signing out stays out", async ({
     page,
   }) => {
     await providerSignsIn(process.env.SMOKE_EMAIL!);
@@ -44,17 +44,17 @@ test.describe("sign-in through the identity provider", () => {
     expect(errors).toEqual([]);
   });
 
-  test("an address nobody bound stops at the error page and does not loop", async ({ page }) => {
-    await providerSignsIn("stranger@example.com");
+  test("whoever the provider signs in gets a session that shows their address", async ({
+    page,
+  }) => {
+    await providerSignsIn("someone@example.com");
 
     await page.goto("/");
-
-    await expect(page).toHaveURL(/\/login\?error=not_bound$/);
-    await expect(page.getByRole("alert").filter({ hasText: "这个账号还没有绑定" })).toBeVisible();
-    await page.waitForTimeout(1_000);
-    await expect(page).toHaveURL(/\/login\?error=not_bound$/);
+    await expect(page).not.toHaveURL(/\/login|\/api\/auth/);
     await page.goto("/settings");
-    await expect(page).toHaveURL(/\/login/);
+
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByText("someone@example.com", { exact: true })).toBeVisible();
   });
 
   test("a refusal at the provider stops at the error page", async ({ page }) => {

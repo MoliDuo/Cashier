@@ -33,8 +33,6 @@ import {
 } from "@/modules/stats/server/enhanced-stats-query";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import { convertCurrency } from "@/modules/currency/server/convert-currency";
-import { requireAuth } from "@/modules/auth/server/session-guards";
-import { listLoginEmails } from "@/modules/auth/server/users";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
 const requestSchema = z
@@ -57,7 +55,6 @@ const requestSchema = z
       "category-assignment-results",
       "source-document-input",
       "convert-currency",
-      "login-emails",
     ]),
     args: z.array(z.unknown()).max(1),
   })
@@ -123,13 +120,6 @@ export async function POST(request: Request) {
       case "convert-currency":
         result = await convertCurrency(input);
         break;
-      // Who may sign in belongs to the account, not the ledger.
-      case "login-emails": {
-        noArgumentsSchema.parse(payload.args);
-        const userId = await requireAuth();
-        result = (await listLoginEmails(userId)).map((row) => row.email);
-        break;
-      }
       case "entries": {
         const { ledger } = await requireLedgerAccess();
         result = await listLedgerEntries(withResolvedPeriod(input, ledger.settings.timeZone));
