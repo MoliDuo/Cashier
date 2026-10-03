@@ -26,7 +26,7 @@ jobs:
       skip: ${{ steps.queue.outputs.skip }}
     steps:
       - id: queue
-        uses: MoliDuo/MoliKit/actions/verified@ada93bc6dbcc24da4d215c3d4f1a00487294504d # v1.1.0
+        uses: MoliDuo/MoliKit/actions/verified@52bbc8ec5c0e34f0bb97fa95dbcca5ffe298d07a # v1.2.0
 
   # The deploy follows a green ci on main, so this is the gate that matters. `npm run check` ends in a production build, which is what a bad dependency bump breaks.
   check:
@@ -53,7 +53,7 @@ jobs:
     steps:
       # The official image, not gitleaks-action (paid for organizations); .gitleaks.toml holds the
       # per-file false positives.
-      - uses: MoliDuo/MoliKit/actions/gitleaks@ada93bc6dbcc24da4d215c3d4f1a00487294504d # v1.1.0
+      - uses: MoliDuo/MoliKit/actions/gitleaks@52bbc8ec5c0e34f0bb97fa95dbcca5ffe298d07a # v1.2.0
 
   # The image is what actually runs: build it as the deploy does, start it with its database and
   # object store, and check that /healthz answers with the commit it was built from.
@@ -126,6 +126,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: MoliDuo/MoliKit/actions/ci-gate@ada93bc6dbcc24da4d215c3d4f1a00487294504d # v1.1.0
+      - uses: MoliDuo/MoliKit/actions/ci-gate@52bbc8ec5c0e34f0bb97fa95dbcca5ffe298d07a # v1.2.0
         with:
           needs: ${{ toJSON(needs) }}
