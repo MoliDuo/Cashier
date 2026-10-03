@@ -1,6 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-
-export const maxDuration = 120;
 import { createSourceDocumentFromCredentialRequest } from "@/modules/source-document/server/create-from-credential-request";
 import { AppError, ValidationError } from "@/lib/errors";
 import { ApiV1HandlerFailure, handleApiV1Route } from "@/server/api-v1/request-pipeline";

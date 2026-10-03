@@ -8,31 +8,18 @@
  * the same act as changing it in a dashboard and redeploying, minus the four
  * places that had to agree about what the number was allowed to be.
  *
- * What stayed in the environment is what genuinely differs between running this
- * on a laptop and running it on Vercel: connection strings, credentials, the
- * bucket, the public URL, and the two switches that change behaviour rather
- * than degree.
+ * What stayed in the environment is what genuinely differs between machines:
+ * connection strings, credentials, the bucket, the public URL, and the switches
+ * that change behaviour rather than degree.
  */
-
-/**
- * The `maxDuration` every AI-running route exports. Route segment config has
- * to be a literal, so the routes repeat the number and a unit test holds them
- * to this one. Every deadline and run budget below must fit inside it.
- */
-export const FUNCTION_MAX_DURATION_SECONDS = 120;
-const FUNCTION_BUDGET_MS = FUNCTION_MAX_DURATION_SECONDS * 1000;
-/** Kept free at the end of a run for writing down how it ended. */
-export const OUTCOME_RESERVE_MS = 10_000;
 
 /**
  * Background leases. A worker renews its lease on every heartbeat; a lease
  * lasts several heartbeats so one slow renewal does not lose it, and only
- * decides how soon work whose function was killed can be claimed again.
+ * decides how soon work whose process died can be claimed again.
  */
-export const LEASE_HEARTBEAT_MS = FUNCTION_BUDGET_MS / 8;
-export const LEASE_DURATION_MS = 4 * LEASE_HEARTBEAT_MS;
-/** How long the daily cron keeps starting new maintenance work. */
-export const CRON_BUDGET_MS = FUNCTION_BUDGET_MS - OUTCOME_RESERVE_MS;
+export const LEASE_HEARTBEAT_MS = 10_000;
+export const LEASE_DURATION_MS = 3 * LEASE_HEARTBEAT_MS;
 /** How often the background worker looks for due work when nothing wakes it. */
 export const BACKGROUND_POLL_INTERVAL_MS = 5_000;
 /** Runs one piece of background work gets, the first one included, before it is failed. */
@@ -43,28 +30,18 @@ export const AI_REQUEST_TIMEOUT_MS = 60_000;
 export const AI_MAX_ATTEMPTS = 3;
 /**
  * Base for the randomized backoff between attempts. Zero under test: there is
- * no provider there to be polite to, and a real backoff eats the `after()`
- * budget an integration test waits on.
+ * no provider there to be polite to, and a real backoff only slows the tests.
  */
 export const AI_RETRY_DELAY_MS = process.env.NODE_ENV === "test" ? 0 : 1_000;
 /**
- * The whole parse of one source document, across however many model calls.
- * Leaves room inside the function limit for the request that scheduled the
- * parse and for recording the outcome, so a slow parse fails as
- * `processing_timeout` instead of being killed and retried from scratch.
+ * The whole parse of one source document, across however many model calls. A
+ * parse that runs longer fails as `processing_timeout`.
  */
-export const AI_ATTEMPT_DEADLINE_MS = FUNCTION_BUDGET_MS - 3 * OUTCOME_RESERVE_MS;
+export const AI_ATTEMPT_DEADLINE_MS = 5 * 60_000;
 
 export const AI_CATEGORY_REQUEST_TIMEOUT_MS = 60_000;
 /** The most entries one category assignment can be started over. */
 export const CATEGORY_ASSIGNMENT_MAX_ENTRIES = 5000;
-/**
- * How long one run keeps starting model requests. A request started at the
- * last moment still has its timeout plus a margin before the function limit;
- * whatever is left is picked up by the next run.
- */
-export const CATEGORY_RUN_BUDGET_MS =
-  FUNCTION_BUDGET_MS - AI_CATEGORY_REQUEST_TIMEOUT_MS - OUTCOME_RESERVE_MS;
 
 /** JPEG quality for a normalised receipt photo. */
 export const MAX_IMAGE_QUALITY = 85;

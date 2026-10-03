@@ -4,7 +4,6 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
 import { runDailyMaintenance } from "@/server/maintenance/daily";
 
-export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 function digest(value: string): Buffer {

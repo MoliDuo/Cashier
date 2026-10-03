@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { LEASE_HEARTBEAT_MS } from "@/config/tuning";
 import { executeProcessingJob } from "@/server/processing/execute-job";
 import { renewProcessingJobLease } from "@/server/processing/jobs";
 import type { ProcessingJobContract } from "@/server/processing/types";
@@ -81,7 +82,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
     });
     const execution = executeProcessingJob(job);
     await generationStarted;
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(LEASE_HEARTBEAT_MS);
 
     expect(renew).toHaveBeenCalledTimes(1);
     expect(processingSignal?.aborted).toBe(true);

@@ -38,13 +38,6 @@ import { listLoginEmails } from "@/modules/auth/server/users";
 import { listPasskeys } from "@/modules/auth/server/passkeys";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
-/**
- * The `category-assignment` poll below is the recovery driver for a batch AI
- * category assignment run, so this handler has to outlive the default function
- * budget the same way the protected page that starts a run does.
- */
-export const maxDuration = 120;
-
 const requestSchema = z
   .object({
     query: z.enum([

@@ -118,19 +118,4 @@ describe("daily upload maintenance", () => {
     );
     expect(await db.select().from(storedFiles)).toHaveLength(3);
   });
-
-  it("starts no cleanup once the deadline has passed", async () => {
-    const { db, storage } = await seed();
-    const objectsBefore = [...storage.files.keys()].sort();
-
-    await expect(runDailyMaintenance({ deadlineAt: Date.now() - 1 })).resolves.toMatchObject({
-      pending_files: "skipped",
-      unused_files: "skipped",
-      temporary_objects: "skipped",
-      orphan_objects: "skipped",
-    });
-
-    expect(await db.select().from(storedFiles)).toHaveLength(5);
-    expect([...storage.files.keys()].sort()).toEqual(objectsBefore);
-  });
 });

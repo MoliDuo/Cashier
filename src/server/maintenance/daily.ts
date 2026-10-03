@@ -14,7 +14,6 @@ import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
 import { refreshExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { temporaryKey } from "@/server/stored-files/shared";
-import { CRON_BUDGET_MS } from "@/config/tuning";
 
 const BATCH = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -29,32 +28,23 @@ export type DailyStep =
   | "temporary_objects"
   | "orphan_objects";
 
-export type DailyStepOutcome = "done" | "failed" | "skipped";
+export type DailyStepOutcome = "done" | "failed";
 
 export interface DailyMaintenanceOptions {
   now?: Date;
-  /** When the run stops starting new steps and batches; defaults to the cron budget. */
-  deadlineAt?: number;
 }
 
 /**
- * The daily sweep behind `/api/cron/daily`. Each step is independent: one
- * that fails is logged and the rest still run, and steps that would start
- * after the deadline are skipped for the next day. Extraction and category
- * work is not part of the sweep: the background worker picks it up as it
- * comes due.
+ * The daily sweep. Each step is independent: one that fails is logged and the
+ * rest still run. Extraction and category work is not part of the sweep: the
+ * background worker picks it up as it comes due.
  */
 export async function runDailyMaintenance(
   options: DailyMaintenanceOptions = {}
 ): Promise<Record<DailyStep, DailyStepOutcome>> {
   const now = options.now ?? new Date();
-  const deadlineAt = options.deadlineAt ?? Date.now() + CRON_BUDGET_MS;
   const outcomes = {} as Record<DailyStep, DailyStepOutcome>;
   const step = async (name: DailyStep, run: () => Promise<void>): Promise<void> => {
-    if (Date.now() >= deadlineAt) {
-      outcomes[name] = "skipped";
-      return;
-    }
     try {
       await run();
       outcomes[name] = "done";
@@ -67,24 +57,24 @@ export async function runDailyMaintenance(
     }
   };
 
-  await step("expired_records", () => deleteExpiredRecords(now, deadlineAt));
+  await step("expired_records", () => deleteExpiredRecords(now));
   await step("exchange_rates", () => refreshExchangeRates(now));
-  await step("pending_files", () => deleteStalePendingFiles(now, deadlineAt));
-  await step("unused_files", () => deleteUnusedFiles(now, deadlineAt));
-  await step("temporary_objects", () => deleteStaleTemporaryObjects(now, deadlineAt));
-  await step("orphan_objects", () => deleteOrphanObjects(now, deadlineAt));
+  await step("pending_files", () => deleteStalePendingFiles(now));
+  await step("unused_files", () => deleteUnusedFiles(now));
+  await step("temporary_objects", () => deleteStaleTemporaryObjects(now));
+  await step("orphan_objects", () => deleteOrphanObjects(now));
   return outcomes;
 }
 
-/** Deletes in batches until a batch comes back short or the deadline passes. */
-async function deleteInBatches(statement: SQL, deadlineAt: number): Promise<void> {
-  while (Date.now() < deadlineAt) {
+/** Deletes in batches until a batch comes back short. */
+async function deleteInBatches(statement: SQL): Promise<void> {
+  for (;;) {
     const result = await db.execute(statement);
     if ((result.rowCount ?? 0) < BATCH) return;
   }
 }
 
-async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void> {
+async function deleteExpiredRecords(now: Date): Promise<void> {
   const twoDaysAgo = new Date(now.getTime() - 2 * DAY_MS);
   const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS);
   const statements = [
@@ -111,7 +101,7 @@ async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void
       LIMIT ${BATCH}
     )`,
   ];
-  for (const statement of statements) await deleteInBatches(statement, deadlineAt);
+  for (const statement of statements) await deleteInBatches(statement);
 }
 
 /**
@@ -119,10 +109,10 @@ async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void
  * then their objects. A document never takes a pending file, so none is in
  * use; an object whose delete fails is left for the orphan sweep.
  */
-async function deleteStalePendingFiles(now: Date, deadlineAt: number): Promise<void> {
+async function deleteStalePendingFiles(now: Date): Promise<void> {
   const dayAgo = new Date(now.getTime() - DAY_MS);
   const storage = getS3Storage();
-  while (Date.now() < deadlineAt) {
+  for (;;) {
     const deleted = await db.execute<{ id: string; storageKey: string }>(sql`
       DELETE FROM ${storedFiles} WHERE id IN (
         SELECT file.id FROM ${storedFiles} AS file
@@ -149,10 +139,10 @@ async function deleteStalePendingFiles(now: Date, deadlineAt: number): Promise<v
  * objects. Rows go first: a submission attaching one of them meanwhile makes
  * the delete fail on the file link's foreign key rather than lose the file.
  */
-async function deleteUnusedFiles(now: Date, deadlineAt: number): Promise<void> {
+async function deleteUnusedFiles(now: Date): Promise<void> {
   const weekAgo = new Date(now.getTime() - UNUSED_FILE_GRACE_DAYS * DAY_MS);
   const storage = getS3Storage();
-  while (Date.now() < deadlineAt) {
+  for (;;) {
     const deleted = await db.execute<{ storageKey: string }>(sql`
       DELETE FROM ${storedFiles} WHERE id IN (
         SELECT file.id FROM ${storedFiles} AS file
@@ -182,7 +172,7 @@ async function deleteUnusedFiles(now: Date, deadlineAt: number): Promise<void> {
  * removes its own; these are uploads that never finished or whose delete
  * failed. Nothing refers to a temporary object, so age alone decides.
  */
-async function deleteStaleTemporaryObjects(now: Date, deadlineAt: number): Promise<void> {
+async function deleteStaleTemporaryObjects(now: Date): Promise<void> {
   const dayAgo = now.getTime() - DAY_MS;
   const storage = getS3Storage();
   let continuationToken: string | null = null;
@@ -195,7 +185,7 @@ async function deleteStaleTemporaryObjects(now: Date, deadlineAt: number): Promi
       await storage.delete(key);
     });
     continuationToken = page.isTruncated ? page.nextContinuationToken : null;
-  } while (continuationToken != null && Date.now() < deadlineAt);
+  } while (continuationToken != null);
 }
 
 /**
@@ -204,7 +194,7 @@ async function deleteStaleTemporaryObjects(now: Date, deadlineAt: number): Promi
  * its object is written, so a younger object without one is never a live
  * upload, and the day's margin covers clocks.
  */
-async function deleteOrphanObjects(now: Date, deadlineAt: number): Promise<void> {
+async function deleteOrphanObjects(now: Date): Promise<void> {
   const dayAgo = now.getTime() - DAY_MS;
   const storage = getS3Storage();
   let continuationToken: string | null = null;
@@ -233,5 +223,5 @@ async function deleteOrphanObjects(now: Date, deadlineAt: number): Promise<void>
       );
     }
     continuationToken = page.isTruncated ? page.nextContinuationToken : null;
-  } while (continuationToken != null && Date.now() < deadlineAt);
+  } while (continuationToken != null);
 }
