@@ -26,15 +26,7 @@ jobs:
       skip: ${{ steps.queue.outputs.skip }}
     steps:
       - id: queue
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          skip=false
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
-            n=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=merge_group&status=success&per_page=1" --jq .total_count)
-            if [ "$n" -gt 0 ]; then skip=true; fi
-          fi
-          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+        uses: MoliDuo/MoliKit/actions/verified@dc80ccfe2668abc86e5de724c5a30312c33b1cab # v1.0.0
 
   # The deploy follows a green ci on main, so this is the gate that matters. `npm run check` ends in a production build, which is what a bad dependency bump breaks.
   check:
@@ -59,13 +51,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      # Not gitleaks-action: it needs a paid license for organizations. The official image, with
-      # .gitleaks.toml for the per-file false positives.
-      - name: Scan the full history
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner
+      # The official image, not gitleaks-action (paid for organizations); .gitleaks.toml holds the
+      # per-file false positives.
+      - uses: MoliDuo/MoliKit/actions/gitleaks@dc80ccfe2668abc86e5de724c5a30312c33b1cab # v1.0.0
 
   # The image is what actually runs: build it as the deploy does, start it with its database and
   # object store, and check that /healthz answers with the commit it was built from.
@@ -138,11 +126,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - run: |
-          results="${{ join(needs.*.result, ' ') }}"
-          if [ "${{ needs.verified.outputs.skip }}" = "true" ]; then
-            echo "Already tested by the merge queue at this commit."
-            [ "${{ needs.verified.result }}" = "success" ]
-          else
-            case " $results " in *" failure "*|*" cancelled "*|*" skipped "*) exit 1 ;; esac
-          fi
+      - uses: MoliDuo/MoliKit/actions/ci-gate@dc80ccfe2668abc86e5de724c5a30312c33b1cab # v1.0.0
+        with:
+          needs: ${{ toJSON(needs) }}
