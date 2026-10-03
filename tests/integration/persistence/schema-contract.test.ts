@@ -325,10 +325,15 @@ describe("PostgreSQL schema contract", () => {
     expect(await fetchColumns("setup_state")).toEqual([]);
   });
 
+  it("keeps no local users, login addresses or session user links", async () => {
+    expect(await fetchColumns("users")).toEqual([]);
+    expect(await fetchColumns("login_emails")).toEqual([]);
+    const sessionColumns = (await fetchColumns("sessions")).map((column) => column.columnName);
+    expect(sessionColumns).not.toContain("user_id");
+    expect(sessionColumns).not.toContain("authenticated_at");
+  });
+
   it("lets a session be opened with only the provider's address", async () => {
-    // The model no longer names `user_id` or `authenticated_at`; they stay in the
-    // database for the previous release, relaxed so this release can insert
-    // without them. The contract migration that follows drops them.
     const db = getTestDb();
     await db.execute(sql`
       INSERT INTO sessions (token_hash, email, expires_at, last_seen_at)
@@ -392,21 +397,10 @@ describe("PostgreSQL schema contract", () => {
   });
 
   it("has no named constraint or index drift from the Drizzle model", async () => {
-    // Names a later contract migration drops once the model has let go of them.
-    const retiredNames = new Set<string>([
-      "uq_login_emails_email",
-      "idx_login_emails_user_id",
-      "fk_login_emails_user",
-      "fk_sessions_user",
-      "idx_sessions_user_id",
-    ]);
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(
-      constraintRows
-        .filter((row) => row.type !== "p")
-        .map((row) => row.conname)
-        .filter((name) => !retiredNames.has(name))
+      constraintRows.filter((row) => row.type !== "p").map((row) => row.conname)
     );
     const constraintBackedIndexes = new Set(
       constraintRows.filter((row) => row.type === "p" || row.type === "u").map((row) => row.conname)
@@ -418,7 +412,6 @@ describe("PostgreSQL schema contract", () => {
         .filter((name) => !name.endsWith("_pkey"))
         // PostgreSQL exposes UNIQUE constraints as both constraints and backing indexes.
         .filter((name) => !constraintBackedIndexes.has(name))
-        .filter((name) => !retiredNames.has(name))
     );
 
     expect({
