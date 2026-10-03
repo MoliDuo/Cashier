@@ -20,7 +20,7 @@
 `npm run check` 分两个阶段（`scripts/run-check.ts`）：先并行跑 `format:check`、`check:architecture`、
 `check:dead-code`、`lint` 和 `tsc`（`next typegen && tsc --noEmit`），任何一项失败就停，不再进入测试；全部通过后并行跑
 `test:coverage` 和 `build:check`。门禁构建设置 `CASHIER_CHECK_BUILD=1`，跳过 Next 自带的第二遍类型检查，
-因为 `tsc` 已经带着生成的路由类型检查过；Vercel 的构建不设置它。每个脚本的输出在它结束时整段打印，最后一张耗时表
+因为 `tsc` 已经带着生成的路由类型检查过；Docker 镜像的构建不设置它，保留 Next 自带的类型检查。每个脚本的输出在它结束时整段打印，最后一张耗时表
 指出慢在哪一步。ESLint 和 Prettier 的缓存放在 `node_modules/.cache/`。
 
 跑单个文件：`npx vitest run tests/unit/path/to/file.test.ts`。Playwright 首次使用前运行
@@ -87,12 +87,14 @@
 fixture；测试可以另加针对用例的 handler。其他任何未处理的 HTTP 请求都会让测试失败，即使应用代码捕获了
 这个错误。诊断信息只含 `TEST_UNEXPECTED_HTTP`、方法和 origin，不含路径、查询参数、凭证和请求体。
 
-### `after()`
+### 后台工作
 
-测试里的 `after()` mock 立即执行回调并跟踪返回的 promise。teardown 在清空数据库或关闭连接池之前等待所有
-跟踪中的工作完成；同步和异步的回调失败都会让测试失败。这个有上限的等待即使在 fake timer 测试里也用真实
-计时器，并保留超时的工作，所以未完成的回调不会悄悄带进下一份干净的数据。不要在清空数据库时加死锁重试来
-掩盖未完成的工作。
+测试环境不启动 worker 和调度器（`NODE_ENV === "test"`），所以没有任何东西在测试之外悄悄运行。需要后台工作
+跑完的测试显式调用 `tests/helpers/background.ts` 的 `drainBackground()`：它对数据库里到期的提取和分类工作
+反复执行 `worker.runOnce()`，直到没有工作为止，返回时所有写入都已经完成。提交事务后调用的
+`requestBackgroundWork()` 在没有订阅者时什么也不做，所以服务端函数的测试不必关心它。worker、调度器、
+advisory lock 和停机交还各有自己的测试；调度器测试用 fake timer 和可注入的"立即运行"函数，不碰真实时间。
+不要在清空数据库时加死锁重试来掩盖未完成的工作：测试结束前要么 `drainBackground()`，要么没有后台工作。
 
 ## 浏览器 smoke
 

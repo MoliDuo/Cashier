@@ -8,9 +8,10 @@
 - **一个账户、一个账本、多个分账。** 账本是单例，分账（books）是用户真正会看到的分区。
 - **一个账户可以挂多个登录邮箱，实际有两个人在用。** "两个人同时编辑同一张票据"是真实会发生的情况，
   但频率很低。
-- **部署在 Vercel Hobby 上。** 函数上限 120 秒，没有常驻 worker，cron 只能按天调度。
-  存储用 Postgres 和 S3 兼容的对象存储。本地开发走同一条应用路径。
-- **AI 调用又慢又贵，还可能失败。** 一次提取可能要几十秒，服务商会限流，函数也可能在调用中途被平台终止。
+- **自建，跑在自己机器的 Docker 里。** 一个常驻的 Node 进程，加 Postgres 和 S3 兼容的对象存储（MinIO），
+  前面是自己的反向代理。没有函数寿命、请求体大小或调度频率的平台限制，后台工作由同一个进程里的 worker 和
+  调度器完成。本地开发走同一条应用路径。
+- **AI 调用又慢又贵，还可能失败。** 一次提取可能要几十秒，服务商会限流，进程也可能在调用中途被重启或崩溃。
 - **界面只有中文。** AI 输出语言可以配置，这是有意保留的功能。
 
 ## 2. 原则
@@ -28,20 +29,21 @@
 4. **默认硬删除。** 删除就是删行，读取不需要软删除谓词。凭证是唯一的例外：它的 `deleted_at` 表示
    "已吊销"，吊销后的行留作审计。
 5. **离开页面是安全的。** 草稿会保留下来，而不是拦住用户不让离开。只有上传还在进行时才拦截关闭页面。
-6. **所有时间预算都从同一个数字推导。** 截止时间、租约长度、单次请求超时都由
-   `FUNCTION_MAX_DURATION_SECONDS`（`src/config/tuning.ts`）算出来，不允许出现比函数寿命更长的截止时间。
-   路由段配置必须写字面量，所以另有测试保证两边一致。
+6. **超时只对应真实的外部等待。** 单次 AI 请求、整个解析、租约心跳各有自己的超时（`src/config/tuning.ts`），
+   彼此只保持一个关系：租约至少是心跳的三倍，单次请求超时不超过整个解析的超时。没有"函数寿命"这个总预算，
+   后台工作可以一直跑到完成。
 7. **测试直接测行为。** 服务端代码跑在真实 Postgres 上测，纯函数写单测，UI 测试保持少量，外加 smoke 流程。
    不 mock 被测代码本身。详见 [testing.md](./testing.md)。
-8. **部署遵守 expand/contract。** 迁移执行时，旧版本还在对外服务。删除一列要分三次发布：
-   先停写，再停读，最后才删。Vercel 先构建再迁移，所有待执行的迁移在一个事务里完成，构建或迁移失败都不会动库。模型不再提到、库里还没删的名字登记在 `schema-contract.test.ts` 的
-   `retiredNames` 里。
+8. **迁移是停机迁移。** 只有一个应用容器：停掉旧容器，容器入口先执行迁移，再启动新版本，迁移期间没有旧版本
+   在对外服务，所以删一列、改一个名字都可以在同一次发布里完成。所有待执行的迁移在一个事务里完成，
+   失败就整体回滚、容器不启动，库保持原样。升级前仍要备份（见 README）。模型不再提到、库里还没删的名字
+   仍然登记在 `schema-contract.test.ts` 的 `retiredNames` 里，用于一次发布里分步清理的情形，不是必须。
 9. **账本是数据库保证的单例。** `ledgers` 只有一行（`uq_ledgers_singleton`），其余表不按账本区分：
    登录即授权，查询不带账本过滤，账本设置直接读这一行。表之间只有单列外键，没有 `ledger_id`。
 
 ## 3. 分层与目录
 
-Cashier 只有一种运行环境（Vercel、PostgreSQL、S3 兼容存储），所以没有 port、adapter 或组装根。
+Cashier 只有一种运行环境（Docker 里的 Node 进程、PostgreSQL、S3 兼容存储），所以没有 port、adapter 或组装根。
 代码直接调用真正干活的函数。
 
 ```
@@ -49,8 +51,8 @@ src/app/                  路由与 API handler：认证、校验、调用、映
   (protected)/(ledger)/   records、entries、stats、settings 四个真实路由，共用一个 layout
   api/ledger-queries      浏览器读取的唯一入口（类型化查询注册表）
   api/v1                  外部 API（快捷指令）
-  api/cron/daily          每日兜底清扫
-  api/stored-files        带授权的文件读取
+  api/stored-files        带授权的图片上传（POST）和文件读取（GET）
+  api/health              容器健康检查
   login、enroll           登录与一次性 passkey 注册
 src/modules/<m>/          auth、currency、ledger、source-document、stats、workspace
   server-actions/         Zod 校验 + withLedgerAccess，然后直接调用 server/ 的函数；只用于命令
@@ -58,8 +60,8 @@ src/modules/<m>/          auth、currency、ledger、source-document、stats、w
   server/                 drizzle 数据访问与事务（"server-only"）
   domain/                 纯决策：状态、金额、解析、提示词；不碰数据库、框架和 IO
   hooks/ ui/              客户端代码，一个界面一个组件加一个 hook
-src/server/               跨模块的后台流程：processing、category-assignment、maintenance、
-                          stored-files、api-v1 请求管线
+src/server/               跨模块的后台流程：background（worker、调度器、唤醒信号）、processing、
+                          category-assignment、maintenance、stored-files、api-v1 请求管线
 src/lib/                  共享基础设施：db（含租约帮手）、s3、ai、email、logger、env、money、format、
                           security、drafts、queries 传输层
 src/persistence/          schema（按领域拆文件）和迁移
@@ -101,7 +103,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 | 提取尝试：`extraction_attempts`                                                                      | 每一次提取：请求的日期、状态、租约、尝试次数、失败码。它本身就是任务队列                                                                                                           |
 | 条目：`ledger_entries`                                                                               | 金额、币种、分类、所属票据（必填）。不存折算值                                                                                                                                     |
 | 汇率：`exchange_rates(rate_date, currency, per_eur, …)`                                              | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间                                                                                            |
-| `stored_files`                                                                                       | 对象存储里文件的登记，`finalized_at` 为空即 pending                                                                                                                                |
+| `stored_files`                                                                                       | 对象存储里文件的登记；先登记行、再写对象，没有任何票据引用的行由每日维护清掉                                                                                                       |
 | 批量分类：`category_assignment_jobs`、`category_assignment_documents`、`category_assignment_entries` | 租约放在 job 行上，进度在读取时统计；`ai` 任务的候选分类就是 `candidate_snapshot`                                                                                                  |
 | 认证                                                                                                 | `users`、`login_emails`、`sessions`、`passkeys`、`webauthn_challenges`、`sign_in_challenges`（登录验证码）、`login_email_challenges`（添加登录邮箱的验证码）、`rate_limit_buckets` |
 | API 密钥：`service_credentials`                                                                      | 吊销时写 `revoked_at`，行留作审计                                                                                                                                                  |
@@ -167,7 +169,8 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 - **密钥。** 每一种摘要都用 `deriveKey` / `keyedDigest`（`src/lib/security/keys.ts`），一种用途一把密钥，
   全部由 `AUTH_SECRET` 经 HKDF 派生。
 - **API v1 凭证。** 192 位随机值，HMAC 存储，绑定到分账。
-- **转发的客户端地址** 默认不可信，除非明确配置了 `TRUSTED_PROXY`。
+- **转发的客户端地址** 默认不可信，除非明确配置了 `TRUSTED_PROXY=proxy`。此时只读反向代理写入的单值
+  `X-Real-IP`，所以应用端口只能对反向代理开放，不能直接暴露。
 - **日志。** 只记关联 id 和经 `logIdentifier` 标记的标识，邮箱和 IP 一律哈希。不记原始邮箱、IP、
   bearer token、OTP、图片内容或服务商负载。
 - 防账号枚举和计时攻击的措施保留。
@@ -176,25 +179,31 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ## 6. 后台运行模型
 
-### 触发与预算
+### Worker 与调度器
 
-- **三种触发方式。**
-  - `after()`：请求结束后立即执行。提交事务里先写一条持久记录，再调用 `after()`，因为 Vercel 可能丢掉
-    `after()`。
-  - 轮询顺带恢复：客户端本来就会轮询，下一次上传、账本查询或流水刷新会捡起中断的任务。
-  - 每日 cron：兜底清扫。
-- **没有全局循环、外部队列或常驻 worker。** runner 认领不到工作时立刻返回，快用完预算时主动停下，
-  剩下的交给下一次触发。
+- **一个进程内的 worker，没有外部队列。** 队列就是数据库行（`extraction_attempts`、
+  `category_assignment_jobs`）。进程启动时（`src/instrumentation.ts`，只在 Node 运行时）启动
+  `src/server/background/` 里的 worker 和调度器；测试环境不启动，测试直接调用 `drainBackground()`。
+- **Worker 有提取和分类两条独立的 lane。** 每条 lane 认领一个到期的工作、跑到完成、再认领下一个，认领不到就
+  等待。提交事务写完持久记录后调用 `requestBackgroundWork()` 唤醒它（进程内信号，挂在 `globalThis` 上）；
+  另有 5 秒的轮询兜底，用来接住重试退避到期的工作、崩溃后租约过期的工作，以及另一个实例写入的工作。
+  不再有 `after()`，也不再靠客户端轮询来恢复中断的任务。
 - **租约。** 只有提取和分类两个流程需要租约，共用 `src/lib/db/lease.ts`，只认数据库时钟：
-  `expires_at > clock_timestamp()` 即持有。租约 60 秒，每 15 秒续一次，都由 `FUNCTION_MAX_DURATION_SECONDS`
-  推导，所以函数被杀后一分钟内就能重新认领。
+  `expires_at > clock_timestamp()` 即持有。租约 30 秒，每 10 秒续一次，进程崩溃后半分钟内就能重新认领。
+  租约和 fencing 仍然保留：容器重启时新旧进程会短暂重叠，将来也可以起第二个实例，它们靠
+  `SKIP LOCKED` 加租约比较交换互斥。
+- **优雅停机。** 收到 SIGTERM 时（Dockerfile 设了 `NEXT_MANUAL_SIG_HANDLE=true`，否则 `next start` 会
+  直接退出），worker 停止认领，给手上的工作 20 秒完成；超时的工作用 fenced release 交还，不计尝试，
+  下一个进程立刻接手，不必等租约过期。容器的 `stop_grace_period` 为 30 秒。
 - **重试。** 错误只在 `src/lib/background/retry.ts` 分类一次：暂时性失败（限流、宕机、超时）按退避重新
   排队，直到第三次尝试；永久性和配置问题立即失败。认领时计数，超过上限的认领在租约下直接失败。
-  恢复只读取到期且没人持有的尝试，重复调度会输掉认领。
+  失败码 `request_bound_retry_exhausted` 是已经落库的值，所以保留取值，只有文案改了。
+- **超时。** 单次 AI 请求 60 秒，整个解析 5 分钟，都是真实的外部等待；没有总预算，分类 run 也不再在预算用完
+  时让出，而是一直处理到 job 完成。
 
 ### 票据提取
 
-- 一次提交创建一个提取尝试（`extraction_attempts` 行），并用 `after()` 安排工作。尝试本身就是队列项。
+- 一次提交创建一个提取尝试（`extraction_attempts` 行），提交后唤醒 worker。尝试本身就是队列项。
 - worker 在尝试仍处于处理中、且仍是票据最新提交时认领它，运行中续租，并在写入结果或失败的同一个事务里
   关闭它。AI 结果写回时做 fencing 检查。
 - `POST /api/v1/source-documents` 在图片处理、对象上传和落库完成后返回 `201`，不等 AI 解析。
@@ -207,9 +216,9 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 - 选择一次提交，最多 `CATEGORY_ASSIGNMENT_MAX_ENTRIES` 个条目；服务端在一个事务里登记 job、票据和条目。
   同时最多一个活动 job，run 租用 job 行，所以只有一个 worker。
-- run 逐个处理到期票据，花完 `CATEGORY_RUN_BUDGET_MS` 就停下，把手上的票据交回且不计尝试。没有待处理票据时，
-  在同一个事务里根据条目结果定下 job 状态。关页面不会取消已开始的 job；job 活动期间，进度轮询每隔几秒起一次
-  新 run，每日 cron 收拾剩下的。
+- worker 的分类 lane 认领 job 后逐个处理到期票据，一直处理到 job 完成；只有优雅停机时才把手上的票据交回且不计
+  尝试。没有待处理票据时，在同一个事务里根据条目结果定下 job 状态。关页面不会取消已开始的 job；
+  进度轮询只读取进度，不再起新的 run。
 - 一张票据是分类的原子提交单位；选中条目超过 50 个的组用持久化的请求块做检查点。外部 AI 请求不保证恰好一次，
   恢复可能重复一个块。
 - **加锁顺序：账本 → 票据 → job 行。** 每一次 worker 写入（决策、重试、失败、应用）都在同一语句或事务里用
@@ -219,28 +228,31 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ### 存储
 
-- 网页图片用短时签名 PUT URL 直传到私有 S3 兼容存储。规划阶段为每张图登记一行 pending 的 `stored_files`，
-  不设额度：只有两个人在用，没有确认的文件由每日 cron 清掉。签名 URL 指向 `temporary/{storedFileId}`，持久 key 是 `stored/{storedFileId}`。
-- 15 分钟内的最终化会核对每个临时对象的 MIME、大小和 SHA-256，用 sharp 归一化（同时剥离 EXIF），写入持久
-  key 并标记 ready；重复最终化原样返回。只有 ready 的文件能挂到提取尝试上。
-- API v1 的内联图片不经过 `temporary/`：服务端归一化后同样预留 pending 行，写入持久对象，再标记 ready。
-  之后提交失败的，丢弃它存下的文件。
+- 网页图片经应用上传：浏览器把一张图的原始字节 POST 到 `/api/stored-files`（需要登录），服务端用 sharp 归一化
+  （同时剥离 EXIF），先登记一行 `stored_files`，再写入 `stored/{storedFileId}`，返回这个 id。一步完成，没有
+  临时对象，也没有 pending 状态。单文件原图最多 20 MiB、约 48 MP，同时最多处理 2 张；一次提交归一化后的总量
+  仍限制在 3 MiB，因为它约束的是发给 AI 的载荷。
+- 行先于对象写入：崩溃后只会留下一行没有对象的记录，它的 id 从未返回给客户端，不会被任何票据引用，
+  由每日维护按"没有被引用"清掉。只有被提取尝试引用的文件才算在用。
+- API v1 的内联图片走同一个存储函数；之后提交失败的，丢弃它存下的文件。
+- 因为 `proxy.ts` 会缓冲请求体，`next.config.ts` 的 `experimental.proxyClientMaxBodySize` 必须不小于 API v1
+  的请求体上限，由仓库测试保证；否则超出的部分会被静默截断。
 - 读取一律经过带授权的 `/api/stored-files/{fileId}`，响应头 `Cache-Control: private, no-store`。
-  实现在 `src/server/stored-files/`，测试通过 mock `@/lib/storage/s3` 替换对象存储。
+  实现在 `src/server/stored-files/`，测试通过 mock `@/lib/storage/s3` 替换对象存储。浏览器从不直接访问
+  对象存储，所以 MinIO 只在容器内部网络里可达。
 
-### 每日 cron
+### 每日维护
 
-`/api/cron/daily`（`src/server/maintenance/daily.ts`）由 Vercel Cron 每天调用一次，用 `CRON_SECRET` 认证。
-请求不再顺带触发维护。每一步在 cron 预算内独立运行：
+调度器（`src/server/background/scheduler.ts`）在进程启动约 30 秒后补跑一次（容器停机期间错过的那次），之后每天
+UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`src/server/maintenance/daily.ts`）。
+运行前取一个 Postgres advisory lock，另一个实例持有时直接跳过。每一步独立运行，一步失败不影响后面的：
 
-1. 过期记录（验证码、challenge、会话、限流桶）；
-2. 用 `after()` 调度到期的提取工作；
-3. 同样调度分类工作；
-4. 刷新汇率，补齐缺失的日期并替换临时值；
-5. 超过 1 天的 pending 文件；
-6. 7 天没有被任何票据使用的 ready 文件（先删行，再删对象）；
-7. `temporary/` 下超过 1 天的对象；
-8. `stored/` 下超过 1 天、没有任何行指向的孤儿对象。
+1. 过期记录（验证码、challenge、会话、限流桶、已结束的分类 job）；
+2. 刷新汇率，补齐缺失的日期并替换临时值；
+3. 7 天没有被任何票据使用的文件（先删行，再删对象）；
+4. `stored/` 下超过 1 天、没有任何行指向的孤儿对象。
+
+提取和分类的恢复不再是维护的一步，worker 的轮询已经覆盖。
 
 ## 7. 前端
 
@@ -278,7 +290,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   而且只放页面真正读的东西：页面到达后才加载的数据（比如分类任务的详情）不进 context，否则它一加载完，
   还在排队显示的页面就会被丢弃重渲染。context 确实要读的数据在外壳之上注水：分类任务的最新一次运行和分账一样
   由服务端带下来，所以页面打开时正有任务在跑，`isActive` 也不会在注水期间变化。客户端到达后仍会读一次，
-  因为这次读取同时负责恢复中断的任务。
+  因为注水数据可能已经过时；这次读取只读进度，不再负责恢复中断的任务，那是 worker 的事。
   查询 key 里放的是周期本身（如 `month:0`），不是解析出的日期，所以预取和页面在任何时刻都命中同一个 key。
 - **周期。** 账本的各个路由共用一种网址写法：`range`（week、month、year、all、custom；month 省略）、
   `offset`（往回最多十年、往后最多一年；0 省略）、自定义时的 `from` / `to`。周期是整个账本的一个状态，在路由之间切换时带过去；
@@ -456,21 +468,28 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   迁移 0025 删掉 `effective_date`。旧前缀下的 1321 张图片用一次性脚本搬到了 `stored/<id>`，
   孤儿扫描随后只看 `stored/`。
 
+- **之后：自建，脱离 Vercel。** 部署目标改成自己机器上的 Docker（应用、Postgres、MinIO，前面是现有的 Traefik），
+  拆掉所有为平台限制而设的设计：`after()` 与"轮询顺带恢复"换成进程内 worker，每日 cron 换成进程内调度器，
+  函数预算、`maxDuration` 和 `FUNCTION_MAX_DURATION_SECONDS` 删除，S3 预签名直传两阶段换成经应用的一步上传
+  （迁移 0026 删掉 `stored_files.finalized_at`），迁移改成停机迁移。租约、fencing、认领比较交换、先写持久记录
+  这些并发保证保留，因为它们保护的是崩溃、重启和重叠，不只是平台限制。
+
 ### 不做
 
 - **条目自带日期。** 多日期输入不常见，为它改约 53 个文件不划算，拆分和日期整理保留。
-- **CI 拦部署。** 推送到 `main` 后 Vercel 立刻构建、迁移并部署，与 CI 并行。继续靠提交前本地 `npm run check` 兜底。
+- **CI 拦部署。** 部署是在自己的机器上手动执行 `docker compose up -d --build`，CI 不参与，也不推镜像。
+  继续靠提交前本地 `npm run check` 兜底。
 - **升级到 TypeScript 7。** 仓库脚本已不再调用 TS 编译器 API，但 typescript-eslint 和 dependency-cruiser
   还依赖它，要等两者支持。
 
 ### 看起来重，但保留
 
 - **金额存储**：`numeric(21,3)` 加 decimal.js，改成整数最小单位得不到任何好处。
-- **AI 流程的租约与 fencing**：`after()` 会重叠执行，函数也可能中途被杀。
-- **提交事务里先写持久记录，再调 `after()`**：Vercel 可能丢掉 `after()`。
-- **分类按请求块做检查点**：大票据的分类一个函数跑不完。
+- **AI 流程的租约与 fencing**：容器重启时新旧进程会短暂重叠，进程也可能崩溃，将来还可以起第二个实例。
+- **提交事务里先写持久记录，再唤醒 worker**：唤醒信号只在进程内，丢了也没关系，worker 的轮询会捡起这条记录。
+- **分类按请求块做检查点**：大票据的分类要花很久，进程中途崩溃或重启后不该从头再来。
 - **先锁账本、再锁票据**：用户自己的编辑会和后台写入竞争。
 - **前端数据层**：React Query、SSR 预取与注水、水位线轮询、专用读取路由，不改成 `revalidatePath`。
 - **API v1 凭证设计、登录前的 Postgres 限流、防账号枚举与计时攻击的措施。**
-- **S3 直传加 sharp 归一化**：Vercel 请求体上限 4.5MB，同时要剥离 EXIF。
+- **sharp 归一化**：上传经应用，服务端统一缩放、转码并剥离 EXIF。
 - **工程底座**：严格的 tsconfig、testcontainers、MSW 网络守卫、smoke 测试、baseline 迁移守卫。

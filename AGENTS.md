@@ -37,18 +37,21 @@ stop the gate on the first failure; the tests and the build then run side by sid
 lists each step's time. Integration tests need a running Docker daemon. Run `npm run test:smoke` as
 well when a change touches sign-in, routing, or the flows the smoke specs cover.
 
-Pushing to `main` deploys: Vercel migrates the production database and builds in parallel with CI,
-so CI does not gate the deploy. The local gate is the gate.
+Deployment is manual: `docker compose up -d --build` on the host builds the image and recreates the
+app container, whose entrypoint migrates the database and then starts the server. CI never deploys,
+so the local gate is the gate.
 
 ## Migrations
 
 - Generate with drizzle-kit, then keep the migration as hand-written SQL; keep only the latest
   snapshot and format the journal with Prettier.
-- Follow expand/contract: the previous release keeps serving while a migration runs. Stop writing a
-  column, then stop reading it, then drop it, each in its own release. Names the model no longer
-  mentions but the database still has go in `retiredNames` in the schema contract test.
-- Vercel builds first and migrates after (`npm run build && npm run db:migrate`), and every pending
-  migration runs in one transaction, so a failed build or migration leaves the database untouched.
+- Migrations are stop-the-world: the old container is stopped before the new one runs `npm run db:migrate`
+  in its entrypoint, so no previous release serves against the new schema and a column can be dropped or
+  renamed in the same release that stops using it. Names the model no longer mentions but the database
+  still has go in `retiredNames` in the schema contract test, which is only needed when a cleanup is
+  split across releases.
+- Every pending migration runs in one transaction under an advisory lock, so a failed migration leaves
+  the database untouched and the container does not start. Back up before upgrading.
 - Name constraints and indexes `uq_<table>_…`, `idx_<table>_…`, `fk_<table>_<target>` and
   `ck_<table>_…`; primary keys stay `<table>_pkey`. The schema contract test enforces it.
 

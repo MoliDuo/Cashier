@@ -103,7 +103,7 @@ npm run account:enroll -- --email you@example.com
 
 ## 配置
 
-本地开发从 `.env.local.example` 开始；Vercel 部署从 `.env.example` 参考填写。空字符串视为未配置。
+本地开发从 `.env.local.example` 开始；Docker 部署从 `.env.example` 开始。空字符串视为未配置。
 
 ### 应用与 AI
 
@@ -119,29 +119,30 @@ npm run account:enroll -- --email you@example.com
 
 ### PostgreSQL
 
-| 变量                | 必需 | 默认值 | 说明                                           |
-| ------------------- | ---- | ------ | ---------------------------------------------- |
-| `DATABASE_URL`      | 是   | 无     | 必须是 `postgres://` 或 `postgresql://` 地址。 |
-| `DATABASE_POOL_MAX` | 否   | `5`    | 连接池上限，范围 1–50。                        |
+| 变量                | 必需 | 默认值 | 说明                                                                                                                            |
+| ------------------- | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | 是   | 无     | 必须是 `postgres://` 或 `postgresql://` 地址。生产环境连非本机主机时必须写明 `sslmode`：`require`、`verify-full` 或 `disable`。 |
+| `DATABASE_POOL_MAX` | 否   | `10`   | 连接池上限，范围 1–50。worker 和请求共用这个池。                                                                                |
 
-### S3 / Cloudflare R2
+`sslmode=disable` 是显式的选择，只适合数据库和应用在同一台机器的内部网络里（Docker compose 就是这样）。
+没有写 `sslmode` 的非本机地址在生产环境会被拒绝，避免忘写时静默明文连接。
 
-| 变量                   | 必需       | 默认值        | 说明                                   |
-| ---------------------- | ---------- | ------------- | -------------------------------------- |
-| `S3_ENDPOINT`          | 是         | 无            | 服务端访问的 S3 兼容端点。             |
-| `S3_PUBLIC_ENDPOINT`   | 视部署而定 | `S3_ENDPOINT` | 浏览器直传时可访问的端点。             |
-| `S3_REGION`            | 否         | `auto`        | R2 使用 `auto`；其他服务按供应商配置。 |
-| `S3_BUCKET`            | 是         | 无            | 已经存在的私有存储桶名称。             |
-| `S3_ACCESS_KEY_ID`     | 是         | 无            | S3 访问密钥 ID。                       |
-| `S3_SECRET_ACCESS_KEY` | 是         | 无            | S3 访问密钥。                          |
-| `S3_FORCE_PATH_STYLE`  | 否         | `false`       | MinIO 等服务通常需要设为 `true`。      |
+### S3 兼容对象存储
+
+| 变量                   | 必需 | 默认值  | 说明                                                   |
+| ---------------------- | ---- | ------- | ------------------------------------------------------ |
+| `S3_ENDPOINT`          | 是   | 无      | 服务端访问的 S3 兼容端点。浏览器从不直接访问对象存储。 |
+| `S3_REGION`            | 否   | `auto`  | MinIO 用任意值即可；其他服务按供应商配置。             |
+| `S3_BUCKET`            | 是   | 无      | 已经存在的私有存储桶名称。                             |
+| `S3_ACCESS_KEY_ID`     | 是   | 无      | S3 访问密钥 ID。                                       |
+| `S3_SECRET_ACCESS_KEY` | 是   | 无      | S3 访问密钥。                                          |
+| `S3_FORCE_PATH_STYLE`  | 否   | `false` | MinIO 等服务通常需要设为 `true`。                      |
 
 ### 认证与内部密钥
 
 | 变量              | 必需   | 默认值                          | 说明                                                             |
 | ----------------- | ------ | ------------------------------- | ---------------------------------------------------------------- |
 | `AUTH_SECRET`     | 运行时 | 本地模板提供                    | 唯一的内部密钥，会话、验证码、限流、API key 的密钥都由它派生。   |
-| `CRON_SECRET`     | 部署   | 无                              | 每日 cron 的调用密钥，至少 32 个字符；未设置时 cron 拒绝运行。   |
 | `AUTH_RESEND_KEY` | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和添加登录邮箱。                 |
 | `AUTH_EMAIL_FROM` | 否     | `Cashier <noreply@example.com>` | 邮箱验证码的发件人。                                             |
 | `DEV_AUTH_BYPASS` | 否     | `false`                         | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。 |
@@ -151,75 +152,110 @@ npm run account:enroll -- --email you@example.com
 
 ### 可信入口、日志与端口
 
-| 变量            | 默认值 | 说明                                                                                                                |
-| --------------- | ------ | ------------------------------------------------------------------------------------------------------------------- |
-| `TRUSTED_PROXY` | 无     | 可选值仅为 `platform`。Vercel 读取单值 `X-Vercel-Forwarded-For`；自建反向代理读取由可信入口覆盖的单值 `X-Real-IP`。 |
-| `LOG_LEVEL`     | `info` | 应用日志级别。                                                                                                      |
-| `S3_PORT`       | `9000` | 本地 MinIO 暴露的端口。                                                                                             |
+| 变量            | 默认值 | 说明                                                                                       |
+| --------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `TRUSTED_PROXY` | 无     | 可选值仅为 `proxy`。设置后读取由你的反向代理覆盖的单值 `X-Real-IP`，应用端口不能直接暴露。 |
+| `LOG_LEVEL`     | `info` | 应用日志级别。                                                                             |
+| `S3_PORT`       | `9000` | 本地开发用的 MinIO 暴露的端口（Docker 部署里 MinIO 不暴露端口）。                          |
 
-未配置可信入口，或平台头为空、多值、非法时，地址会归入固定的哈希 `unknown` 桶，登录限流仍然生效。客户端地址只用于登录限流，API v1 和登录后的操作不限流。
+未配置可信入口，或 `X-Real-IP` 为空、多值、非法时，地址会归入固定的哈希 `unknown` 桶，登录限流仍然生效。客户端地址只用于登录限流，API v1 和登录后的操作不限流。
 
 ### 调参常量
 
-重试次数、超时、限流额度、图片质量、恢复批量这些数字不是环境变量，它们在 `src/config/tuning.ts` 里，
-改一个数字然后部署即可。图片上限为 16 MP 业务校验和 24 MP sharp 解码保护。批量分类一次最多提交 5,000 条
-明细，同时只跑一个任务，同一账单每次 AI 请求最多包含 50 条明细。
+重试次数、超时、限流额度、图片质量这些数字不是环境变量，它们在 `src/config/tuning.ts` 里，
+改一个数字然后重新部署即可。上传的单张原图最多 20 MiB、约 48 MP；一次提交归一化后的总量限制在 3 MiB（它约束
+发给 AI 的载荷）。批量分类一次最多提交 5,000 条明细，同时只跑一个任务，同一账单每次 AI 请求最多包含 50 条明细。
 
-## 部署到 Vercel
+## 部署（Docker）
 
-生产环境部署在 Vercel 上，PostgreSQL 和 S3 兼容对象存储由你提供。把仓库导入 Vercel，在项目环境变量中配置：
+Cashier 以一个常驻的 Node 进程运行在 Docker 里，和 PostgreSQL、MinIO 一起由 `compose.yaml` 编排。
+后台提取、批量分类和每日维护都在应用进程内完成，不需要外部的定时任务或队列。
 
-- `APP_URL`：公开地址。
-- `DATABASE_URL`：外部 PostgreSQL 连接地址。
-- `S3_ENDPOINT`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`，以及浏览器能访问的
-  `S3_PUBLIC_ENDPOINT`。桶必须预先创建。
-- `OPENAI_API_KEY`。
-- `TRUSTED_PROXY=platform`：**必须设置**。否则所有请求的客户端 IP 都记为 `unknown`，按 IP 的登录限流会变成
-  所有人共用一个桶，陌生人的请求也会把你挡在登录页外。
-- `AUTH_SECRET`：安全随机值，在重启、预览实例和多次构建之间保持一致。更换它会让所有会话、未用的验证码和
-  API key 失效。
-- `CRON_SECRET`：至少 32 个字符，例如 `openssl rand -hex 32`。
+### 准备
 
-然后按"连接真实服务"一节，在能连到生产数据库的机器上用相同的 `DATABASE_URL`、`AUTH_SECRET`、`APP_URL`
-运行 `account:create` 和 `account:enroll`。
+```bash
+cp .env.example .env
+```
 
-`vercel.json` 写明了三件事（JSON 写不了注释，理由记在这里）：
+编辑 `.env`，至少填写：
 
-- **`buildCommand` 是 `npm run build && npm run db:migrate`。** 先构建后迁移：构建失败时数据库不动；迁移在
-  advisory lock 下、在一个事务里执行，失败就整体回滚并让这次部署失败，不会部署出 schema 对不上的版本。旧版本
-  只在迁移执行的那几秒里面对新 schema。写在仓库里而不是控制台，重建项目或 fork 之后也不会丢掉迁移这一步。
-- **`ignoreCommand` 跳过 `main` 以外的构建**，因为不需要预览环境，而 Dependabot 的 PR 会触发没人看的构建。
-  判断用 `VERCEL_GIT_COMMIT_REF`，并且**取不到分支名时照常构建**：写成"不是 main 就跳过"的话，变量读不到时
-  连生产也会被跳过。那行 `echo` 把实际取值打进构建日志，方便排查。
-- **每日 cron**：每天 UTC 18:00（北京时间凌晨 2 点，ECB 已发布当天汇率）调用 `/api/cron/daily`，带
-  `Authorization: Bearer <CRON_SECRET>`。它清理过期记录，给待处理任务补一次调度，刷新汇率，
-  并清理对象存储。返回的 JSON 列出每一步是 `done`、`failed` 还是 `skipped`。手动触发：
+- `CASHIER_HOST`：对外域名，例如 `cashier.example.com`。`APP_URL` 必须是 `https://<CASHIER_HOST>`，
+  passkey 的 RP 和注册链接都由它决定；以后改域名会让已有的 passkey 失效。
+- `POSTGRES_PASSWORD`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`：随机值，例如 `openssl rand -hex 24`。
+- `OPENAI_API_KEY`（以及按需的 `OPENAI_BASE_URL`、`AI_MODEL`）。
+- `AUTH_SECRET`：安全随机值，在重启和升级之间保持一致。更换它会让所有会话、未用的验证码和 API key 失效。
+- `CASHIER_DATA_DIR`：数据库和对象存储的宿主机目录，默认 `./data`。
 
-  ```sh
-  curl -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/daily
-  ```
+### 启动
 
-对象存储没有需要手动运行的清理命令。cron 总是先删记录再删对象：删对象失败只会留下没有记录的对象，
+```bash
+docker compose up -d --build
+```
+
+应用容器的入口先在 advisory lock 下、一个事务里执行迁移，成功后才启动服务；迁移失败时容器退出，数据库保持原样。
+Postgres 和 MinIO 只在 compose 的内部网络里，不占用宿主机端口。应用监听容器内的 3000 端口，由反向代理转发。
+
+创建账号和注册链接（命令在应用容器里执行，读取容器自己的环境变量）：
+
+```bash
+docker compose exec app npm run account:create -- --email you@example.com
+docker compose exec app npm run account:enroll -- --email you@example.com
+```
+
+### 反向代理
+
+passkey 和手机相机都要求 HTTPS，所以应用前面必须有终止 TLS 的反向代理。`compose.yaml` 里带有 Traefik 的 labels，
+并让应用加入外部网络 `server-internal-net`（Traefik 所在的网络）；用别的反向代理时，删掉这些 labels 和那个网络，
+自己转发到应用的 3000 端口。无论用哪种代理，都要满足：
+
+- 保留原始的 `Host`（和 `X-Forwarded-Host`），并设置 `X-Forwarded-Proto: https`。否则登录和所有 server action
+  会因为来源检查失败，会话 cookie 也会丢掉 `Secure`。
+- 用连接的真实客户端地址**覆盖**请求里的 `X-Real-IP`，并设置 `TRUSTED_PROXY=proxy`。不设置的话，所有请求的
+  客户端 IP 都记为 `unknown`，按 IP 的登录限流会变成所有人共用一个桶，陌生人的请求也会把你挡在登录页外；
+  设置了但代理没有覆盖这个头，别人就能伪造来源地址绕过限流。
+- 读超时至少几分钟：上传和 AI 请求都可能持续几十秒。
+- 请求体上限不小于 32 MiB（API v1 的请求体上限）。
+
+### 每日维护与后台工作
+
+应用进程启动约 30 秒后补跑一次维护，之后每天 UTC 18:00（ECB 已发布当天汇率）运行一次：清理过期记录，刷新汇率，
+清理没有被引用的文件和孤儿对象。每一步的结果写在日志里。容器停机期间错过的那次，会在下次启动时补上。
+提取和批量分类由 worker 处理，提交后立即开始；容器重启时，没做完的工作在新进程里接着做。
+
+收到停止信号（`docker compose stop`、重新部署）时，应用停止领取新工作，给手上的工作 20 秒完成，其余的交还队列，
+由下一个进程接手。`stop_grace_period` 设为 30 秒。
+
+对象存储没有需要手动运行的清理命令。维护总是先删记录再删对象：删对象失败只会留下没有记录的对象，
 下一次再删，不会出现记录还在、对象却没了的情况。
 
 ## 升级、备份与恢复
 
 升级前：
 
-1. 备份 PostgreSQL。
-2. 备份 S3/R2/MinIO 存储桶。
-3. 记录当前部署的 Git 提交号。
-4. 阅读目标版本的提交记录和迁移变化。
+1. 备份 PostgreSQL 和 MinIO 的数据目录（`CASHIER_DATA_DIR` 下的 `postgres`、`minio`）。如果数据目录在 ZFS 上，
+   先打一个快照最简单。
+2. 记录当前部署的 Git 提交号。
+3. 阅读目标版本的提交记录和迁移变化。
 
-迁移在新版本构建成功之后、上线之前执行，旧版本在此之前（以及构建或迁移失败时）继续对外服务，所以迁移默认
-兼容正在运行的旧版本；例外见 `docs/architecture.md` 的决定记录。迁移链已经压缩成 `0000_baseline.sql`，等于 0057 之前所有迁移执行完后的 schema；还没升到
-0057 的数据库，`npm run db:migrate` 会拒绝执行，并提示先部署 `pre-baseline` 这个 tag。
+升级：
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+compose 会先停掉旧的应用容器，再创建新的；新容器的入口先迁移再启动，所以迁移期间没有旧版本在对外服务，
+迁移可以直接删列、改名，不需要 expand/contract。所有待执行的迁移在一个事务里完成：迁移失败就整体回滚，新容器不会
+启动，数据库保持原样，用旧提交重新 `docker compose up -d --build` 即可回到升级前。迁移链已经压缩成
+`0000_baseline.sql`，等于 0057 之前所有迁移执行完后的 schema；还没升到 0057 的数据库，`npm run db:migrate`
+会拒绝执行，并提示先部署 `pre-baseline` 这个 tag。
 
 完整备份包括：PostgreSQL 数据库、存储桶里的对象、`AUTH_SECRET` 等内部密钥（放在专用密钥管理系统里），
 以及非敏感配置的记录。恢复时使用彼此对应的数据库和对象存储快照，只恢复一项会留下缺图片的记录或没人引用的对象。
 
-本地的 `docker-compose.local.yml` 有两个具名卷：`cashier_postgres`（数据库）和 `cashier_minio`（原始票据图片）。
-`npm run docker:down` 只停止并移除容器，保留这些卷；加 `-v` 会永久删除数据库和图片。
+`docker compose down` 只停止并移除容器，数据目录保持不动；删除数据目录会永久删除数据库和图片。
+本地开发用的 `docker-compose.local.yml` 有两个具名卷：`cashier_postgres` 和 `cashier_minio`，
+`npm run docker:down` 同样保留它们，加 `-v` 会永久删除。
 
 ## 开发
 
