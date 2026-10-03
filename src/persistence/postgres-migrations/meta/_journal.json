@@ -204,6 +204,13 @@
       "when": 1791003831927,
       "tag": "0028_sessions_carry_the_provider_email",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791004831927,
+      "tag": "0029_drop_retired_auth_tables",
+      "breakpoints": true
     }
   ]
 }
