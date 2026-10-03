@@ -30,7 +30,7 @@ describe("runtimeEnv", () => {
     env.DATABASE_POOL_MAX = "2";
     expect(getStartupEnvValue("DATABASE_POOL_MAX", env)).toBe(2);
     delete env.DATABASE_POOL_MAX;
-    expect(getStartupEnvValue("DATABASE_POOL_MAX", env)).toBe(5);
+    expect(getStartupEnvValue("DATABASE_POOL_MAX", env)).toBe(10);
   });
   it("reads validated application env through typed accessors", async () => {
     process.env = {
