@@ -43,11 +43,12 @@ export function AuthLoginPage({
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <Image
-            src="/icon.png"
+            src="/icon.svg"
             alt=""
             width={48}
             height={48}
-            className="mx-auto mb-4 rounded-lg border border-border"
+            unoptimized
+            className="mx-auto mb-4"
           />
           <h1 className={textRoleClassName("pageTitle")}>
             <span translate="no">Moli Cashier</span>

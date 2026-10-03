@@ -17,7 +17,7 @@ describe("AuthLoginPage", () => {
   it("presents Moli Cashier as a quiet app entry with one way in, a link to the provider sign-in", () => {
     render(<AuthLoginPage callbackUrl="/settings" />);
 
-    expect(document.querySelector('img[src*="icon.png"]')).toHaveAttribute("alt", "");
+    expect(document.querySelector('img[src*="icon.svg"]')).toHaveAttribute("alt", "");
     expect(screen.getByRole("heading", { name: "Moli Cashier" })).toBeInTheDocument();
     expect(screen.getByText("一个安静的个人账本")).toBeInTheDocument();
     // A plain link, so the browser follows the redirect to the provider itself.

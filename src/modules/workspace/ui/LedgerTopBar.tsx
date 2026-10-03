@@ -1,14 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  SquareCheckBig,
-  Plus,
-  Wallet,
-  X,
-} from "lucide-react";
+import Image from "next/image";
+import { ChevronDown, ChevronLeft, ChevronRight, SquareCheckBig, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import type { LedgerTab } from "@/lib/ledger-tabs";
@@ -67,7 +60,7 @@ export function LedgerTopBar({
         )}
       >
         <span className="hidden items-center gap-2 pl-1 font-semibold text-text md:inline-flex">
-          <Wallet className="size-5 text-primary" aria-hidden="true" />
+          <Image src="/icon.svg" alt="" width={24} height={24} unoptimized className="size-6" />
           Moli Cashier
         </span>
         {!inSettings && headerSelection != null ? (
