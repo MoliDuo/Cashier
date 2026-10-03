@@ -61,7 +61,7 @@
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "1.47.0",
-    "next": "16.3.5",
+    "next": "16.3.6",
     "next-themes": "^0.4.6",
     "openai": "7.20.0",
     "openid-client": "^6.8.8",
