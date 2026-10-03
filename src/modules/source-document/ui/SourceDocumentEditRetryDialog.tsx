@@ -78,11 +78,7 @@ function EditRetryDialogContent({
   const seedReady = !needsFetch || inputData != null;
 
   return (
-    <Dialog
-      name="record.edit_retry"
-      open={open}
-      onOpenChange={(next) => (next ? onOpenChange(true) : requestClose())}
-    >
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : requestClose())}>
       <DialogContent
         variant="detail"
         className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-lg sm:rounded-lg"

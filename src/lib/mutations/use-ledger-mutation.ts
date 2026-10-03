@@ -1,16 +1,9 @@
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { toast } from "@/lib/toast";
+import { toast } from "sonner";
 import { syncLedgerAfterWrite } from "@/lib/mutations/ledger-sync";
-import { errorKindOf, startOperation } from "@/lib/telemetry/client";
 import { commonCopy } from "@/copy/common";
 
 export interface UseLedgerMutationOptions<TData, TVariables> {
-  /**
-   * What this command is called in telemetry, as `area.action` (`entry.update`,
-   * `record.create`). Each run is recorded as a `$op` with its duration and
-   * whether it succeeded. Never put an id or any user text in it.
-   */
-  name: string;
   mutationFn: (variables: TVariables) => Promise<TData>;
   /**
    * What the command waits for before it counts as done. By default the whole
@@ -34,21 +27,11 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
   options: UseLedgerMutationOptions<TData, TVariables>
 ) {
   const queryClient = useQueryClient();
-  const { name, mutationFn, waitFor, successMessage, errorMessage, onSuccess, onError, onSettled } =
+  const { mutationFn, waitFor, successMessage, errorMessage, onSuccess, onError, onSettled } =
     options;
 
   return useMutation<TData, Error, TVariables>({
-    mutationFn: async (variables) => {
-      const op = startOperation(name);
-      try {
-        const data = await mutationFn(variables);
-        op.succeed();
-        return data;
-      } catch (error) {
-        op.fail(errorKindOf(error));
-        throw error;
-      }
-    },
+    mutationFn,
     onSuccess: async (data, variables) => {
       try {
         await onSuccess?.(data, variables);

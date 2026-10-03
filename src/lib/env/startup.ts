@@ -87,12 +87,6 @@ const startupEnvFields = {
     blankToUndefined,
     z.string().trim().min(32, "CRON_SECRET must be at least 32 characters").optional()
   ),
-  // MoliInsight telemetry. Both unset (the default) turns telemetry off without an error.
-  INSIGHT_URL: z.preprocess(
-    blankToUndefined,
-    z.url({ error: "INSIGHT_URL must be a valid URL" }).optional()
-  ),
-  INSIGHT_KEY: z.preprocess(blankToUndefined, z.string().trim().optional()),
   TZ: stringWithDefault("TZ"),
   AI_MODEL: stringWithDefault("AI_MODEL"),
   LOG_LEVEL: stringWithDefault("LOG_LEVEL"),

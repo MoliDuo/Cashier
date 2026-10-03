@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type SetStateAction } from "react";
 import type { ChangeEvent, ClipboardEvent } from "react";
-import { toast } from "@/lib/toast";
+import { toast } from "sonner";
 import { useIsTouchInput } from "@/hooks/use-is-touch-input";
 import {
   clearDraft,
@@ -15,7 +15,6 @@ import {
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { fireAndForget } from "@/lib/safe-async";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
-import { track } from "@/lib/telemetry/client";
 import type { RetrySourceDocumentResponseDto } from "@/modules/source-document/contracts";
 import { createSourceDocumentAction } from "@/modules/source-document/server-actions/create";
 import { editRetrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
@@ -62,8 +61,6 @@ interface CreateVariables {
 
 interface RetryVariables {
   payload: SourceDocumentSubmitPayload;
-  /** Ties this submit's `record.submit` to the server's `processing.finished`. */
-  correlationId: string;
   signal: AbortSignal;
 }
 
@@ -166,7 +163,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
 
   /** Drops the kept input and goes back to what the form opened with. */
   const discardDraft = () => {
-    track("record.draft", { mode, action: "discard" });
     setText(initialDraft.text);
     replaceImages(toEditableImages(initialData?.images));
     setDateState(createDraftDateState(initialData, timeZone));
@@ -190,7 +186,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   }
 
   const setEntryDate = (date: Date) => {
-    noteInput("date");
     setDateState((current) => ({ ...current, entryDate: date, touched: true }));
   };
 
@@ -206,60 +201,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     imagesRef.current = images;
     latestRef.current = { text, images, dateState, isDraftDirty, storageKey };
   }, [dateState, storageKey, images, isDraftDirty, text]);
-
-  // --- Telemetry --------------------------------------------------------------
-  // Types, counts and durations only: never the text, an image or a date.
-
-  const telemetryRef = useRef({
-    openedAt: 0,
-    submittedAt: 0,
-    submitting: false,
-    succeeded: false,
-    inputKinds: new Set<"text" | "date">(),
-  });
-  const noteInput = (kind: "text" | "image" | "date", count?: number) => {
-    const state = telemetryRef.current;
-    if (kind !== "image") {
-      if (state.inputKinds.has(kind)) return;
-      state.inputKinds.add(kind);
-    }
-    track("record.input", { mode, kind, ...(count == null ? {} : { count }) });
-  };
-  const trackResult = (
-    correlationId: string,
-    failure?: { error: Error; fallback: "createError" | "retryError" }
-  ) => {
-    const state = telemetryRef.current;
-    state.submitting = false;
-    state.succeeded = failure == null;
-    track("record.result", {
-      mode,
-      correlationId,
-      ok: failure == null,
-      ms: Date.now() - state.submittedAt,
-      ...(failure == null
-        ? {}
-        : { errorKind: submitErrorMessageKey(failure.error, failure.fallback) ?? "cancelled" }),
-    });
-  };
-  useEffect(() => {
-    const state = telemetryRef.current;
-    state.openedAt = Date.now();
-    track("record.open", { mode, restored: restored != null });
-    if (restored != null) track("record.draft", { mode, action: "restore" });
-    return () => {
-      if (state.succeeded) return;
-      const latest = latestRef.current;
-      track("record.abandon", {
-        mode,
-        hadInput: latest.isDraftDirty,
-        submitting: state.submitting,
-        imageCount: latest.images.length,
-        chars: latest.text.length,
-        openMs: Date.now() - state.openedAt,
-      });
-    };
-  }, [mode, restored]);
 
   useEffect(() => {
     if (!isDraftDirty) {
@@ -353,7 +294,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     Awaited<ReturnType<typeof createSourceDocumentAction>>,
     CreateVariables
   >({
-    name: "record.create",
     mutationFn: async (variables) => {
       const currentIdentity = createSubmissionIdentityRef.current;
       let uploadedPayload =
@@ -393,19 +333,16 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
       ) {
         createSubmissionIdentityRef.current = null;
       }
-      trackResult(variables.clientSubmissionId);
       await completeSubmit(variables.payload.documentDate, data.sourceDocumentId, variables.signal);
     },
     onError: (error, variables) => {
-      trackResult(variables.clientSubmissionId, { error, fallback: "createError" });
       reportSubmitError(error, "createError");
       finishUpload(variables.signal);
     },
   });
 
   const retryMutation = useLedgerMutation<RetrySourceDocumentResponseDto, RetryVariables>({
-    name: "record.edit_retry",
-    mutationFn: async ({ payload, correlationId, signal }) => {
+    mutationFn: async ({ payload, signal }) => {
       if (sourceDocumentId == null) throw new Error("No source document ID for retry");
       const uploadedPayload = await uploadSourceDocumentSubmissionImages(
         payload,
@@ -413,16 +350,14 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
         setMonotonicProgress
       );
       setMonotonicProgress({ phase: "submitting", percent: 90 });
-      return editRetrySourceDocumentAction(sourceDocumentId, uploadedPayload, correlationId);
+      return editRetrySourceDocumentAction(sourceDocumentId, uploadedPayload);
     },
     successMessage: sourceDocumentInputCopy.retrySuccess,
     errorMessage: null,
     onSuccess: async (_data, variables) => {
-      trackResult(variables.correlationId);
       await completeSubmit(variables.payload.documentDate, sourceDocumentId!, variables.signal);
     },
     onError: (error, variables) => {
-      trackResult(variables.correlationId, { error, fallback: "retryError" });
       reportSubmitError(error, "retryError");
       finishUpload(variables.signal);
     },
@@ -450,21 +385,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
         };
       }
     }
-    const correlationId =
-      mode === "retry"
-        ? crypto.randomUUID()
-        : createSubmissionIdentityRef.current!.clientSubmissionId;
-    const telemetry = telemetryRef.current;
-    telemetry.submittedAt = Date.now();
-    telemetry.submitting = true;
-    telemetry.succeeded = false;
-    track("record.submit", {
-      mode,
-      correlationId,
-      imageCount: images.length,
-      chars: text.length,
-      dateEdited: dateState.touched,
-    });
     // The progress bar paints before the upload starts compressing images.
     runAfterPaint(() => {
       if (controller.signal.aborted) {
@@ -475,7 +395,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
         return;
       }
       if (mode === "retry") {
-        retryMutation.mutate({ payload, correlationId, signal: controller.signal });
+        retryMutation.mutate({ payload, signal: controller.signal });
         return;
       }
       createMutation.mutate({
@@ -546,7 +466,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     const acceptedImages = loadedImages.slice(0, Math.max(0, MAX_FILES - imageCountRef.current));
     if (acceptedImages.length < loadedImages.length) toast.error(tooManyImages);
     if (acceptedImages.length === 0) return;
-    noteInput("image", acceptedImages.length);
     imageCountRef.current += acceptedImages.length;
     replaceImages((previousImages) => [
       ...previousImages,
@@ -640,10 +559,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     isCameraOpen,
     openCamera: () => setIsCameraOpen(true),
     collapseCamera: () => setIsCameraOpen(false),
-    setText: (value: SetStateAction<string>) => {
-      noteInput("text");
-      setText(value);
-    },
+    setText,
     setEntryDate,
     openImage: (index: number) => setSelectedImageIndex(index),
     closeImage: () => setSelectedImageIndex(null),

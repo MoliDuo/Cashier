@@ -99,16 +99,4 @@ describe("runtimeEnv", () => {
 
     expect(runtimeEnv.databaseUrl).toBe("postgresql://cashier:cashier@localhost:5432/cashier");
   });
-
-  it("reads the optional telemetry settings, undefined when unset", async () => {
-    process.env = { ...originalEnv, ...baseEnv, INSIGHT_URL: "", INSIGHT_KEY: "" };
-    const { runtimeEnv } = await import("@/lib/env/runtime");
-    expect(runtimeEnv.insightUrl).toBeUndefined();
-    expect(runtimeEnv.insightKey).toBeUndefined();
-
-    process.env.INSIGHT_URL = "https://insight.example";
-    process.env.INSIGHT_KEY = "mi_key";
-    expect(runtimeEnv.insightUrl).toBe("https://insight.example");
-    expect(runtimeEnv.insightKey).toBe("mi_key");
-  });
 });

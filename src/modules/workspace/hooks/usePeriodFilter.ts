@@ -6,7 +6,6 @@ import { readLedgerFilterParams, updateLedgerSearchParams } from "../ledger-url-
 import { pushLedgerUrl } from "../ledger-url-navigation";
 import { buildLedgerEntryFilters } from "../ledger-filter-state";
 import { readPeriodParams, writePeriodParams } from "../period-url-params";
-import { trackFilterApply, trackPeriodSwitch } from "../telemetry";
 
 interface UsePeriodFilterParams {
   pathname: string;
@@ -36,17 +35,13 @@ export function usePeriodFilter({ pathname, searchParams }: UsePeriodFilterParam
         statuses: next.statuses ?? [],
         search: next.search ?? null,
       });
-      trackFilterApply(next);
       pushLedgerUrl(pathname, params, "filter");
     },
     [pathname, searchParams]
   );
 
   const handlePeriodChange = useCallback(
-    (next: Period) => {
-      trackPeriodSwitch("entries", next);
-      pushLedgerUrl(pathname, writePeriodParams(searchParams, next), "filter");
-    },
+    (next: Period) => pushLedgerUrl(pathname, writePeriodParams(searchParams, next), "filter"),
     [pathname, searchParams]
   );
 

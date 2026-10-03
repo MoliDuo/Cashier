@@ -173,37 +173,4 @@ describe("validateStartupEnv", () => {
       "TZ",
     ]);
   });
-
-  describe("telemetry (INSIGHT_URL, INSIGHT_KEY)", () => {
-    it("treats both as optional: unset or blank is valid and means off", () => {
-      const unset = validateStartupEnv(baseEnv);
-      expect(unset.INSIGHT_URL).toBeUndefined();
-      expect(unset.INSIGHT_KEY).toBeUndefined();
-
-      const blank = validateStartupEnv({ ...baseEnv, INSIGHT_URL: "  ", INSIGHT_KEY: "" });
-      expect(blank.INSIGHT_URL).toBeUndefined();
-      expect(blank.INSIGHT_KEY).toBeUndefined();
-    });
-
-    it("accepts a URL and a key", () => {
-      expect(
-        validateStartupEnv({
-          ...baseEnv,
-          INSIGHT_URL: "https://insight.example",
-          INSIGHT_KEY: " mi_key ",
-        })
-      ).toMatchObject({ INSIGHT_URL: "https://insight.example", INSIGHT_KEY: "mi_key" });
-    });
-
-    it("rejects a URL that is not one, without echoing the key", () => {
-      let message = "";
-      try {
-        validateStartupEnv({ ...baseEnv, INSIGHT_URL: "insight", INSIGHT_KEY: "mi_do-not-log" });
-      } catch (error) {
-        message = error instanceof Error ? error.message : String(error);
-      }
-      expect(message).toContain("INSIGHT_URL");
-      expect(message).not.toContain("mi_do-not-log");
-    });
-  });
 });

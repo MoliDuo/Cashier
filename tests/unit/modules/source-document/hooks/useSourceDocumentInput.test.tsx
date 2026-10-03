@@ -9,7 +9,6 @@ import { clearAllDrafts } from "@/lib/drafts";
 import type { SourceDocumentInputProps } from "@/modules/source-document/ui/source-document-input.types";
 
 const {
-  trackMock,
   createSourceDocumentActionMock,
   loadFilesMock,
   retrySourceDocumentActionMock,
@@ -17,7 +16,6 @@ const {
   toastSuccessMock,
   uploadSubmissionImagesMock,
 } = vi.hoisted(() => ({
-  trackMock: vi.fn(),
   createSourceDocumentActionMock: vi.fn(),
   loadFilesMock: vi.fn(),
   retrySourceDocumentActionMock: vi.fn(),
@@ -31,10 +29,6 @@ vi.mock("@/modules/source-document/server-actions/create", () => ({
 }));
 vi.mock("@/modules/source-document/server-actions/retry", () => ({
   editRetrySourceDocumentAction: retrySourceDocumentActionMock,
-}));
-vi.mock("@/lib/telemetry/client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/telemetry/client")>()),
-  track: trackMock,
 }));
 vi.mock("sonner", () => ({
   toast: { error: toastErrorMock, success: toastSuccessMock },
@@ -121,7 +115,6 @@ function objectUrlImage(data: string) {
 
 describe("useSourceDocumentInput", () => {
   beforeEach(() => {
-    trackMock.mockReset();
     createSourceDocumentActionMock.mockReset();
     retrySourceDocumentActionMock.mockReset();
     toastErrorMock.mockReset();
@@ -536,120 +529,13 @@ describe("useSourceDocumentInput", () => {
       );
       expect(retrySourceDocumentActionMock).toHaveBeenCalledWith(
         "source-1",
-        expect.objectContaining({ text: "Original", documentDate: "2026-07-17" }),
-        expect.any(String)
+        expect.objectContaining({ text: "Original", documentDate: "2026-07-17" })
       );
       expect(onSuccess).toHaveBeenCalledWith({
         sourceDocumentId: "source-1",
         documentDate: "2026-07-17",
       });
     });
-  });
-});
-
-describe("useSourceDocumentInput telemetry", () => {
-  beforeEach(() => {
-    trackMock.mockReset();
-    createSourceDocumentActionMock.mockReset();
-    retrySourceDocumentActionMock.mockReset();
-    uploadSubmissionImagesMock.mockReset();
-    uploadSubmissionImagesMock.mockImplementation(async (payload: unknown) => payload);
-    clearAllDrafts();
-    window.localStorage.clear();
-  });
-
-  const events = (name: string) =>
-    trackMock.mock.calls.filter(([event]) => event === name).map(([, props]) => props);
-
-  it("records open, first input, submit and result with one correlation id, and no abandon", async () => {
-    createSourceDocumentActionMock.mockResolvedValue({ sourceDocumentId: "source-1" });
-    const { result, unmount } = renderInput({ timeZone: "UTC" });
-    expect(events("record.open")).toEqual([{ mode: "create", restored: false }]);
-
-    act(() => result.current.setText("secret lunch note"));
-    act(() => result.current.setText("secret lunch note 2"));
-    expect(events("record.input")).toEqual([{ mode: "create", kind: "text" }]);
-
-    act(() => result.current.handleSubmit());
-    await waitFor(() => expect(createSourceDocumentActionMock).toHaveBeenCalledTimes(1));
-    const clientSubmissionId = createSourceDocumentActionMock.mock.calls[0]?.[1];
-    expect(events("record.submit")).toEqual([
-      {
-        mode: "create",
-        correlationId: clientSubmissionId,
-        imageCount: 0,
-        chars: "secret lunch note 2".length,
-        dateEdited: false,
-      },
-    ]);
-    await waitFor(() => expect(events("record.result")).toHaveLength(1));
-    expect(events("record.result")[0]).toMatchObject({
-      mode: "create",
-      correlationId: clientSubmissionId,
-      ok: true,
-    });
-
-    unmount();
-    expect(events("record.abandon")).toEqual([]);
-    // Types, counts and ids only: nothing the user typed.
-    expect(JSON.stringify(trackMock.mock.calls)).not.toContain("secret");
-  });
-
-  it("records a failed submit with an error code, then the abandon when the form closes", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-    createSourceDocumentActionMock.mockRejectedValue(new Error("boom: secret detail"));
-    const { result, unmount } = renderInput({ timeZone: "UTC" });
-    act(() => result.current.setText("Lunch"));
-    act(() => result.current.handleSubmit());
-    await waitFor(() => expect(events("record.result")).toHaveLength(1));
-    expect(events("record.result")[0]).toMatchObject({ ok: false, errorKind: "createError" });
-
-    unmount();
-    expect(events("record.abandon")).toEqual([
-      expect.objectContaining({
-        mode: "create",
-        hadInput: true,
-        submitting: false,
-        imageCount: 0,
-        chars: 5,
-      }),
-    ]);
-    expect(JSON.stringify(trackMock.mock.calls)).not.toContain("secret");
-  });
-
-  it("records an abandon for a form closed untouched", () => {
-    const { unmount } = renderInput({ timeZone: "UTC" });
-    unmount();
-    expect(events("record.abandon")).toEqual([
-      expect.objectContaining({ hadInput: false, submitting: false, chars: 0 }),
-    ]);
-  });
-
-  it("sends a retry's correlation id to the action as well as to record.submit", async () => {
-    retrySourceDocumentActionMock.mockResolvedValue({ status: "processing" });
-    const { result } = renderInput({
-      mode: "retry",
-      sourceDocumentId: "source-1",
-      initialData: { text: "Original", entryDate: "2026-07-17" },
-    });
-    act(() => result.current.handleSubmit());
-    await waitFor(() => expect(retrySourceDocumentActionMock).toHaveBeenCalledTimes(1));
-    const [submit] = events("record.submit") as Array<{ correlationId: string }>;
-    expect(submit?.correlationId).toEqual(expect.any(String));
-    expect(retrySourceDocumentActionMock.mock.calls[0]?.[2]).toBe(submit?.correlationId);
-  });
-
-  it("records a restored draft and its discard", () => {
-    const first = renderInput({ timeZone: "UTC" });
-    act(() => first.result.current.setText("kept"));
-    first.unmount();
-    trackMock.mockClear();
-
-    const second = renderInput({ timeZone: "UTC" });
-    expect(events("record.open")).toEqual([{ mode: "create", restored: true }]);
-    expect(events("record.draft")).toEqual([{ mode: "create", action: "restore" }]);
-    act(() => second.result.current.discardDraft());
-    expect(events("record.draft")).toContainEqual({ mode: "create", action: "discard" });
   });
 });
 
@@ -684,8 +570,7 @@ describe("SourceDocumentInput", () => {
     await waitFor(() =>
       expect(retrySourceDocumentActionMock).toHaveBeenCalledWith(
         "source-1",
-        expect.objectContaining({ text: "Unsaved" }),
-        expect.any(String)
+        expect.objectContaining({ text: "Unsaved" })
       )
     );
     await waitFor(() =>

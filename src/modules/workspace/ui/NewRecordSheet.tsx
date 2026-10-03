@@ -84,7 +84,7 @@ export function NewRecordSheet({
   const selectedBookId = selectedBook?.id ?? "";
 
   return (
-    <Dialog name="record.new" open={isOpen} onOpenChange={handleOpenChange} closeOnBack={false}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange} closeOnBack={false}>
       <DialogContent
         variant="sheet"
         className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[90dvh] sm:max-w-md"

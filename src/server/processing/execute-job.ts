@@ -10,8 +10,6 @@ import {
   ProcessingFailure,
 } from "@/modules/source-document/domain/parse/contracts";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
-import { sendServerEvent } from "@/lib/telemetry/server";
-import type { ServerEventMap } from "@/lib/telemetry/events";
 import { claimProcessingJob, renewProcessingJobLease, rescheduleProcessingJob } from "./jobs";
 import { processAttempt } from "./attempt-processor";
 import { BACKGROUND_MAX_ATTEMPTS } from "@/config/tuning";
@@ -29,30 +27,6 @@ function toFailureCode(error: unknown): ProcessingFailureCode {
     default:
       return "processing_unavailable";
   }
-}
-
-type ProcessingFinished = Pick<ServerEventMap["processing.finished"], "outcome" | "errorKind">;
-
-/**
- * Telemetry for an attempt that reached its end: how it ended and how long the
- * submission took to get there, tied to the browser's `record.submit` by the
- * job's correlation id. Best effort and silent when telemetry is not configured.
- */
-function reportFinished(
-  job: ProcessingJobContract,
-  runs: number,
-  finished: ProcessingFinished
-): Promise<void> {
-  return sendServerEvent(
-    "processing.finished",
-    {
-      outcome: finished.outcome,
-      ms: Math.max(0, Date.now() - Date.parse(job.requestedAt) || 0),
-      runs,
-      ...(finished.errorKind == null ? {} : { errorKind: finished.errorKind }),
-    },
-    job.correlationId
-  );
 }
 
 /**
@@ -77,10 +51,6 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
       failureMessage: "Processing retry limit reached",
       failureCode: "request_bound_retry_exhausted",
     });
-    await reportFinished(job, claim.runNumber, {
-      outcome: "failed",
-      errorKind: "request_bound_retry_exhausted",
-    });
     return true;
   }
 
@@ -94,26 +64,15 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
     }
   );
 
-  let finished: ProcessingFinished | null = null;
   try {
-    const result = await processAttempt({
+    await processAttempt({
       sourceDocumentId: claim.job.sourceDocumentId,
       attemptId: claim.job.attemptId,
       signal: held.signal,
       lease,
     });
-    finished =
-      result.processingStatus === "completed"
-        ? { outcome: "completed" }
-        : { outcome: "failed", errorKind: "invalid_input" };
   } catch (error) {
-    if (error instanceof ProcessingCancelledError || held.signal.aborted) {
-      // A lost lease is not an ending: whoever holds the attempt now reports it.
-      if (error instanceof ProcessingCancelledError && !held.signal.aborted) {
-        finished = { outcome: "cancelled" };
-      }
-      return true;
-    }
+    if (error instanceof ProcessingCancelledError || held.signal.aborted) return true;
     const classified = classifyFailure(error);
     if (classified.kind === "transient" && claim.runNumber < BACKGROUND_MAX_ATTEMPTS) {
       const delayMs = retryDelayMs(claim.runNumber, classified.retryAfterMs);
@@ -135,10 +94,8 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
       failureMessage: error instanceof Error ? error.message : "Processing failed",
       failureCode: toFailureCode(error),
     });
-    finished = { outcome: "failed", errorKind: toFailureCode(error) };
   } finally {
     held.stop();
-    if (finished != null) await reportFinished(job, claim.runNumber, finished);
   }
 
   return true;

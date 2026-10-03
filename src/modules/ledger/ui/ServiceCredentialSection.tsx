@@ -6,7 +6,7 @@ import type {
   ServiceCredential,
   CreatedServiceCredentialDto,
 } from "@/modules/ledger/contracts";
-import { toast } from "@/lib/toast";
+import { toast } from "sonner";
 import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -21,9 +21,6 @@ export const TEST_STARTUP_ENV = Object.freeze({
   LOG_LEVEL: "",
   DEV_AUTH_BYPASS: "",
   DATABASE_POOL_MAX: "",
-  // Telemetry stays off in tests, whatever the developer's shell has set.
-  INSIGHT_URL: "",
-  INSIGHT_KEY: "",
 });
 
 type Overrides = Partial<NodeJS.ProcessEnv>;

@@ -14,8 +14,6 @@ import {
 } from "@/components/ui/dialog";
 
 interface ConfirmDialogProps {
-  /** What telemetry calls this dialog; see `Dialog`'s `name`. */
-  name?: string;
   title: string;
   description: string;
   onConfirm: (onCommitted: () => void) => void | boolean | Promise<void | boolean>;
@@ -34,7 +32,6 @@ interface ConfirmDialogProps {
 import { commonCopy } from "@/copy/common";
 
 export const ConfirmDialog = memo(function ConfirmDialog({
-  name,
   title,
   description,
   onConfirm,
@@ -72,7 +69,7 @@ export const ConfirmDialog = memo(function ConfirmDialog({
     : {};
 
   return (
-    <Dialog {...dialogProps} {...(name == null ? {} : { name })}>
+    <Dialog {...dialogProps}>
       {trigger != null && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
         variant="modal"

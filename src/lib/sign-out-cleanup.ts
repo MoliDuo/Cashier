@@ -3,12 +3,7 @@
 import { clearBookScopeCookie } from "./book-scope-cookie";
 import { clearAllDrafts } from "./drafts";
 
-/**
- * The prefix every other key the app keeps in localStorage starts with. Only
- * keys with it are removed, so the telemetry SDK's `moli_insight_` keys (the
- * device id, which would otherwise reset on every sign-out, and its unsent
- * queue) stay. Do not widen this to clearing all of localStorage.
- */
+/** The prefix every other key the app keeps in localStorage starts with. */
 const APP_STORAGE_PREFIX = "cashier:";
 
 /**

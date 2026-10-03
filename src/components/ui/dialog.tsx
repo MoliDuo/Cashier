@@ -6,27 +6,13 @@ import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
 import { commonCopy } from "@/copy/common";
 import { useOverlayHistory } from "@/lib/navigation/overlay-history";
-import { trackDialog } from "@/lib/telemetry/client";
 
 const DialogDepthContext = React.createContext(0);
 
-/** How a dialog is being closed, for telemetry; anything not set by a gesture below is "action". */
-type CloseBy = "action" | "escape" | "outside" | "close_button" | "back";
-const DialogCloseByContext = React.createContext<React.MutableRefObject<CloseBy>>({
-  current: "action",
-});
-
 function Dialog({
   closeOnBack = true,
-  name,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root> & {
-  /**
-   * What telemetry calls this dialog (`period.picker`, `entry.delete`). A named
-   * dialog records `$dialog` open and close with how it was closed and how long
-   * it stayed open; one without a name records nothing. Never put user text in it.
-   */
-  name?: string;
   /**
    * Back — an iPhone's edge swipe — closes the dialog rather than leaving the
    * page under it. A dialog whose open state already lives in the URL, where
@@ -36,29 +22,10 @@ function Dialog({
 }) {
   const parentDepth = React.useContext(DialogDepthContext);
   const { open = false, onOpenChange } = props;
-  const closeByRef = React.useRef<CloseBy>("action");
-  useOverlayHistory(
-    open,
-    () => {
-      closeByRef.current = "back";
-      onOpenChange?.(false);
-    },
-    closeOnBack
-  );
-  // The cleanup runs when the dialog closes and when a dialog mounted open is unmounted.
-  React.useEffect(() => {
-    if (name == null || !open) return;
-    trackDialog(name, "open");
-    return () => {
-      trackDialog(name, "close", closeByRef.current);
-      closeByRef.current = "action";
-    };
-  }, [name, open]);
+  useOverlayHistory(open, () => onOpenChange?.(false), closeOnBack);
   return (
     <DialogDepthContext.Provider value={parentDepth + 1}>
-      <DialogCloseByContext.Provider value={closeByRef}>
-        <DialogPrimitive.Root {...props} />
-      </DialogCloseByContext.Provider>
+      <DialogPrimitive.Root {...props} />
     </DialogDepthContext.Provider>
   );
 }
@@ -117,8 +84,6 @@ const DialogContent = React.forwardRef<
       hideCloseButton = false,
       onExitComplete,
       onInteractOutside,
-      onEscapeKeyDown,
-      onPointerDownOutside,
       onOpenAutoFocus,
       onCloseAutoFocus,
       style,
@@ -127,7 +92,6 @@ const DialogContent = React.forwardRef<
     ref
   ) => {
     const depth = React.useContext(DialogDepthContext) - 1;
-    const closeByRef = React.useContext(DialogCloseByContext);
     return (
       <DialogPortal>
         <DialogOverlay className="duration-200" />
@@ -155,31 +119,17 @@ const DialogContent = React.forwardRef<
             onExitComplete?.();
           }}
           {...props}
-          onEscapeKeyDown={(event) => {
-            onEscapeKeyDown?.(event);
-            if (!event.defaultPrevented) closeByRef.current = "escape";
-          }}
-          onPointerDownOutside={(event) => {
-            onPointerDownOutside?.(event);
-            if (!event.defaultPrevented) closeByRef.current = "outside";
-          }}
           onInteractOutside={(event) => {
             if (event.target instanceof Element && event.target.closest("[data-sonner-toast]")) {
               event.preventDefault();
-              closeByRef.current = "action";
               return;
             }
             onInteractOutside?.(event);
-            // An outside press that was refused did not close the dialog.
-            if (event.defaultPrevented) closeByRef.current = "action";
           }}
         >
           {children}
           {hideCloseButton ? null : (
             <DialogPrimitive.Close
-              onClick={() => {
-                closeByRef.current = "close_button";
-              }}
               className={cn(
                 "absolute right-2 top-2 flex size-11 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground sm:right-4 sm:top-4 sm:size-8",
                 // A full-screen sheet pads its header below the status bar, so

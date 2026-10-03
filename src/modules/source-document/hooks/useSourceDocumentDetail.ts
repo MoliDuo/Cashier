@@ -2,13 +2,12 @@
 
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/lib/toast";
+import { toast } from "sonner";
 import { LEDGER, QUERY } from "@/lib/constants";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { openLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
 import { queryKeys } from "@/lib/query-keys";
 import { useSelection } from "@/hooks/use-selection";
-import { track } from "@/lib/telemetry/client";
 import type { BookDto, LedgerEntry } from "@/modules/ledger/contracts";
 import { fetchBook } from "@/modules/ledger/queries";
 import {
@@ -143,7 +142,6 @@ export function useSourceDocumentDetail({
   };
 
   const documentMutation = useLedgerMutation<unknown, DocumentPatch>({
-    name: "detail.update_document",
     mutationFn: (data) => batchUpdateSourceDocumentsAction({ sourceDocumentIds: [id], data }),
     waitFor: detailKey,
   });
@@ -151,7 +149,6 @@ export function useSourceDocumentDetail({
     unknown,
     { entryId: string; patch: Partial<EntryEditData> }
   >({
-    name: "detail.update_entry",
     mutationFn: ({ entryId, patch }) => batchUpdateLedgerEntriesAction([id], [entryId], patch),
     waitFor: detailKey,
   });
@@ -159,7 +156,6 @@ export function useSourceDocumentDetail({
     SplitSourceDocumentResultDto,
     Omit<SplitSourceDocumentInput, "sourceDocumentId">
   >({
-    name: "detail.split",
     waitFor: false,
     mutationFn: (input) => splitSourceDocumentAction({ sourceDocumentId: id, ...input }),
     onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
@@ -168,25 +164,21 @@ export function useSourceDocumentDetail({
     ApplyDateOrganizationResultDto,
     Omit<ApplyDateOrganizationInput, "sourceDocumentId">
   >({
-    name: "detail.apply_date_organization",
     mutationFn: (input) => applyDateOrganizationAction({ sourceDocumentId: id, ...input }),
     waitFor: detailKey,
     onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
   });
   const dismissDateOrganizationMutation = useLedgerMutation<{ dismissed: true }, string>({
-    name: "detail.dismiss_date_organization",
     mutationFn: (suggestionId) =>
       dismissDateOrganizationAction({ sourceDocumentId: id, suggestionId }),
     waitFor: detailKey,
   });
   const addEntryMutation = useLedgerMutation<{ ledgerEntryId: string }, AddEntryData>({
-    name: "detail.add_entry",
     mutationFn: (data) =>
       createLedgerEntryAction({ sourceDocumentId: id, ...data, amount: String(data.amount) }),
     waitFor: detailKey,
   });
   const deleteEntryMutation = useLedgerMutation<{ ledgerEntryId: string; deleted: true }, string>({
-    name: "detail.delete_entry",
     mutationFn: (entryId) => deleteLedgerEntryAction(id, entryId),
     waitFor: detailKey,
   });
@@ -194,17 +186,14 @@ export function useSourceDocumentDetail({
     { ledgerEntryIds: string[]; affectedCount: number },
     { ids: string[]; patch: BatchPatch }
   >({
-    name: "detail.batch_update_entries",
     mutationFn: ({ ids, patch }) => batchUpdateLedgerEntriesAction([id], ids, patch),
     waitFor: detailKey,
   });
   const batchDeleteMutation = useLedgerMutation<PartialBatchCommandResult, string[]>({
-    name: "detail.batch_delete_entries",
     mutationFn: (entryIds) => batchDeleteLedgerEntriesAction([id], entryIds),
     waitFor: detailKey,
   });
   const deleteDocumentMutation = useLedgerMutation<unknown, void>({
-    name: "detail.delete_document",
     waitFor: false,
     mutationFn: () => deleteSourceDocumentAction(id),
     successMessage: commonCopy.deleteSuccess,
@@ -215,20 +204,17 @@ export function useSourceDocumentDetail({
     },
   });
   const cancelMutation = useLedgerMutation<unknown, void>({
-    name: "detail.cancel_processing",
     mutationFn: () => cancelSourceDocumentProcessingAction(id),
     successMessage: sourceDocumentActionCopy.cancelSuccess,
     errorMessage: sourceDocumentActionCopy.cancelError,
   });
   const retryMutation = useLedgerMutation<unknown, void>({
-    name: "detail.retry",
     mutationFn: () => retrySourceDocumentAction(id),
     waitFor: detailKey,
     successMessage: sourceDocumentActionCopy.retrySuccess,
     errorMessage: sourceDocumentActionCopy.retryError,
   });
   const assignBookMutation = useLedgerMutation({
-    name: "detail.assign_book",
     // An archived target says so instead of snapping the picker back silently.
     errorMessage: commonCopy.bookChangeFailed,
     mutationFn: (bookId: string) =>
@@ -281,9 +267,7 @@ export function useSourceDocumentDetail({
     setPending((current) => ({ ...current, document: { ...current.document, ...changed } }));
     try {
       await documentMutation.mutateAsync(changed);
-      track("detail.edit", { target: "document", fields: keys, ok: true });
     } catch {
-      track("detail.edit", { target: "document", fields: keys, ok: false });
       await reportFailedWrite();
     } finally {
       setPending((current) => ({ ...current, document: withoutKeys(current.document, keys) }));
@@ -304,14 +288,11 @@ export function useSourceDocumentDetail({
       patch
     );
     if (changed.itemName !== undefined && changed.itemName.trim() === "") return;
-    const fields = Object.keys(changed);
-    if (fields.length === 0) return;
+    if (Object.keys(changed).length === 0) return;
     setPending((current) => ({ ...current, entries: { ...current.entries, [entryId]: changed } }));
     try {
       await entryMutation.mutateAsync({ entryId, patch: changed });
-      track("detail.edit", { target: "entry", fields, ok: true });
     } catch {
-      track("detail.edit", { target: "entry", fields, ok: false });
       await reportFailedWrite(entryId);
     } finally {
       setPending((current) => ({ ...current, entries: withoutKeys(current.entries, [entryId]) }));

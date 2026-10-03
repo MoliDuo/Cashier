@@ -5,7 +5,6 @@ import { AlertCircle, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { textRoleClassName } from "@/components/typography";
 import { errorCopy } from "@/copy/app";
-import { track } from "@/lib/telemetry/client";
 
 export default function Error({
   error,
@@ -16,13 +15,6 @@ export default function Error({
   useEffect(() => {
     // Log the error to an error reporting service
     console.error(error);
-    // Type and digest only: the message can quote user input.
-    track("$error", {
-      kind: "boundary",
-      source: "app/error",
-      name: error.name,
-      ...(error.digest == null ? {} : { digest: error.digest }),
-    });
   }, [error]);
 
   return (

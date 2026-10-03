@@ -36,7 +36,6 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
       },
       ...(payload.documentDate == null ? {} : { documentDate: payload.documentDate }),
       timeZone: ledger.settings.timeZone,
-      correlationId: validatedClientSubmissionId,
       idempotency: {
         principalType: "user",
         principalId: userId,

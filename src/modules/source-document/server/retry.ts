@@ -12,14 +12,11 @@ interface SourceDocumentRetryPayload {
 interface RetrySourceDocumentInput {
   sourceDocumentId: string;
   input?: SourceDocumentRetryPayload;
-  /** The browser's id for this submit, carried to the processing telemetry event. */
-  correlationId?: string;
 }
 
 export async function retrySourceDocument({
   sourceDocumentId,
   input,
-  correlationId,
 }: RetrySourceDocumentInput): Promise<RetrySourceDocumentResponseDto> {
   const pending = await submitSourceDocument({
     sourceDocumentId,
@@ -27,6 +24,6 @@ export async function retrySourceDocument({
     supersedeProcessing: true,
     ...(input == null ? {} : { input }),
   });
-  scheduleProcessingAfter(correlationId == null ? pending.job : { ...pending.job, correlationId });
+  scheduleProcessingAfter(pending.job);
   return { status: "processing" };
 }

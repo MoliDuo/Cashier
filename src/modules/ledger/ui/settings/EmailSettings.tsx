@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
-import { toast } from "@/lib/toast";
+import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";

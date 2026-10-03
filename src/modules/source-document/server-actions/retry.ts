@@ -2,7 +2,6 @@
 import { retrySourceDocument } from "../server/retry";
 import type { RetrySourceDocumentResponseDto } from "@/modules/source-document/contracts";
 import {
-  clientSubmissionIdSchema,
   parseSourceDocumentId,
   retrySourceDocumentInputSchema,
   type RetrySourceDocumentInputContract,
@@ -46,11 +45,9 @@ export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
     { ledger },
     sourceDocumentId: string,
-    input: RetrySourceDocumentInputContract,
-    correlationId?: string
+    input: RetrySourceDocumentInputContract
   ): Promise<RetrySourceDocumentResponseDto> => {
     const validatedSourceDocumentId = parseSourceDocumentId(sourceDocumentId);
-    const validatedCorrelationId = clientSubmissionIdSchema.optional().parse(correlationId);
     const parsedInput = retrySourceDocumentInputSchema.parse(input);
     // A retry sent without a day is dated today in the ledger's zone, like a
     // new record; the record never falls back to its UTC creation day.
@@ -63,7 +60,6 @@ export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
     const result = await retrySourceDocument({
       sourceDocumentId: validatedSourceDocumentId,
       input: validatedInput,
-      ...(validatedCorrelationId == null ? {} : { correlationId: validatedCorrelationId }),
     });
 
     // Also recover any missed processing intents

@@ -11,7 +11,6 @@ import type { EntryEditData } from "@/modules/source-document/types";
 import { SourceDocumentDetailModal } from "@/modules/source-document/ui/SourceDocumentDetailModal";
 
 const {
-  trackMock,
   toastErrorMock,
   fetchDetailMock,
   updateDocumentMock,
@@ -22,7 +21,6 @@ const {
   retryMock,
   editRetryDialogMock,
 } = vi.hoisted(() => ({
-  trackMock: vi.fn(),
   toastErrorMock: vi.fn(),
   fetchDetailMock: vi.fn(),
   updateDocumentMock: vi.fn(),
@@ -70,10 +68,6 @@ vi.mock("@/modules/ledger/server-actions/entries", () => ({
   batchDeleteLedgerEntriesAction: vi.fn(),
 }));
 
-vi.mock("@/lib/telemetry/client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/telemetry/client")>()),
-  track: trackMock,
-}));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: toastErrorMock, warning: vi.fn() },
 }));
@@ -368,44 +362,6 @@ describe("SourceDocumentDetailModal", () => {
     await act(async () => write.resolve({ updatedCount: 1 }));
     await waitFor(() => expect(fetchDetailMock).toHaveBeenCalled());
     expect(screen.getByText("title: Dinner receipt")).toBeInTheDocument();
-  });
-
-  it("records a title or date write as detail.edit by field name, never the value", async () => {
-    trackMock.mockClear();
-    renderModal();
-
-    fireEvent.click(screen.getByText("rename"));
-    await waitFor(() =>
-      expect(trackMock).toHaveBeenCalledWith("detail.edit", {
-        target: "document",
-        fields: ["title"],
-        ok: true,
-      })
-    );
-    expect(JSON.stringify(trackMock.mock.calls)).not.toContain("Dinner receipt");
-  });
-
-  it("records an entry write, and a failed one as not ok", async () => {
-    trackMock.mockClear();
-    updateEntriesMock.mockRejectedValueOnce(new Error("boom"));
-    renderModal();
-
-    fireEvent.click(screen.getByText("rename-entry"));
-    await waitFor(() =>
-      expect(trackMock).toHaveBeenCalledWith("detail.edit", {
-        target: "entry",
-        fields: ["itemName"],
-        ok: false,
-      })
-    );
-    expect(JSON.stringify(trackMock.mock.calls)).not.toContain("Brunch");
-  });
-
-  it("records nothing for a title left as it was", () => {
-    trackMock.mockClear();
-    renderModal();
-    fireEvent.click(screen.getByText("rename-unchanged"));
-    expect(trackMock).not.toHaveBeenCalledWith("detail.edit", expect.anything());
   });
 
   it("writes nothing for a title left as it was", () => {

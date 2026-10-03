@@ -10,19 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { queryKeys } from "@/lib/query-keys";
 
-const { toastSuccessMock, toastErrorMock, op, startOperationMock } = vi.hoisted(() => {
-  const op = { succeed: vi.fn(), fail: vi.fn() };
-  return {
-    toastSuccessMock: vi.fn(),
-    toastErrorMock: vi.fn(),
-    op,
-    startOperationMock: vi.fn(() => op),
-  };
-});
-
-vi.mock("@/lib/telemetry/client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/telemetry/client")>()),
-  startOperation: startOperationMock,
+const { toastSuccessMock, toastErrorMock } = vi.hoisted(() => ({
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -65,7 +55,6 @@ describe("useLedgerMutation", () => {
         detail: useQuery({ queryKey: key, queryFn: detailFn }),
         list: useQuery({ queryKey: queryKeys.ledgerEntriesPrefix(), queryFn: listFn }),
         mutation: useLedgerMutation({
-          name: "test.run",
           waitFor: key,
           mutationFn: async () => "saved",
         }),
@@ -105,7 +94,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          name: "test.run",
           waitFor: false,
           mutationFn: async () => "saved",
         }),
@@ -134,7 +122,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          name: "test.run",
           mutationFn: async () => "saved",
           successMessage: "Saved",
           onSuccess: async () => {
@@ -163,7 +150,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          name: "test.run",
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -191,7 +177,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          name: "test.run",
           mutationFn: async () => "saved",
           successMessage: "Saved",
           errorMessage: "Failed",
@@ -219,7 +204,6 @@ describe("useLedgerMutation", () => {
       const { result } = renderHook(
         () =>
           useLedgerMutation({
-            name: "test.run",
             mutationFn: async () => "saved",
             successMessage: null,
           }),
@@ -254,7 +238,6 @@ describe("useLedgerMutation", () => {
         () => ({
           query: useQuery({ queryKey: queryKeys.ledgerSettings(), queryFn }),
           mutation: useLedgerMutation({
-            name: "test.run",
             mutationFn,
             successMessage: null,
           }),
@@ -287,7 +270,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          name: "test.run",
           mutationFn: async () => {
             throw new Error("write failed");
           },
@@ -317,7 +299,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          name: "test.run",
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -338,7 +319,6 @@ describe("useLedgerMutation", () => {
       () => ({
         query: useQuery({ queryKey: ["ledger", "entries", {}], queryFn }),
         mutation: useLedgerMutation({
-          name: "test.run",
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -366,7 +346,6 @@ describe("useLedgerMutation", () => {
           getNextPageParam: (lastPage) => (lastPage < 4 ? lastPage + 1 : undefined),
         }),
         mutation: useLedgerMutation({
-          name: "test.run",
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -398,11 +377,7 @@ describe("useLedgerMutation", () => {
         () => ({
           sync: useQuery({ queryKey: queryKeys.ledgerSync(), queryFn: sync, staleTime: Infinity }),
           list: useQuery({ queryKey: ["ledger", "entries", {}], queryFn: list }),
-          mutation: useLedgerMutation({
-            name: "test.run",
-            mutationFn: async () => "saved",
-            successMessage: null,
-          }),
+          mutation: useLedgerMutation({ mutationFn: async () => "saved", successMessage: null }),
         }),
         { wrapper }
       );
@@ -439,61 +414,6 @@ describe("useLedgerMutation", () => {
         { throwOnError: true }
       );
       expect(list).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("telemetry", () => {
-    beforeEach(() => {
-      startOperationMock.mockClear();
-      op.succeed.mockClear();
-      op.fail.mockClear();
-    });
-
-    it("records each run as an op under its name, ok when it resolves", async () => {
-      const { wrapper } = setup();
-      const { result } = renderHook(
-        () =>
-          useLedgerMutation({
-            name: "entry.update",
-            waitFor: false,
-            mutationFn: async () => "saved",
-            successMessage: null,
-          }),
-        { wrapper }
-      );
-
-      await act(async () => {
-        await result.current.mutateAsync();
-      });
-
-      expect(startOperationMock).toHaveBeenCalledWith("entry.update");
-      expect(op.succeed).toHaveBeenCalledTimes(1);
-      expect(op.fail).not.toHaveBeenCalled();
-    });
-
-    it("records a failure by its error code, never its message, and still rejects", async () => {
-      const { wrapper } = setup();
-      const error = Object.assign(new Error("amount 12.50 at Cafe Moli"), { code: "CONFLICT" });
-      const { result } = renderHook(
-        () =>
-          useLedgerMutation({
-            name: "entry.update",
-            waitFor: false,
-            mutationFn: async () => {
-              throw error;
-            },
-            errorMessage: null,
-          }),
-        { wrapper }
-      );
-
-      await act(async () => {
-        await expect(result.current.mutateAsync()).rejects.toBe(error);
-      });
-
-      expect(op.fail).toHaveBeenCalledWith("CONFLICT");
-      expect(JSON.stringify(op.fail.mock.calls)).not.toContain("Cafe");
-      expect(op.succeed).not.toHaveBeenCalled();
     });
   });
 });

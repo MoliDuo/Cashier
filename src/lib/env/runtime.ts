@@ -18,8 +18,6 @@ export interface RuntimeEnv {
   readonly s3ForcePathStyle: boolean;
   readonly trustedProxy: string | undefined;
   readonly cronSecret: string | undefined;
-  readonly insightUrl: string | undefined;
-  readonly insightKey: string | undefined;
   readonly aiModel: string;
   readonly databasePoolMax: number;
 }
@@ -81,12 +79,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get cronSecret() {
     return getStartupEnvValue("CRON_SECRET");
-  },
-  get insightUrl() {
-    return getStartupEnvValue("INSIGHT_URL");
-  },
-  get insightKey() {
-    return getStartupEnvValue("INSIGHT_KEY");
   },
   get aiModel() {
     return getStartupEnvValue("AI_MODEL");

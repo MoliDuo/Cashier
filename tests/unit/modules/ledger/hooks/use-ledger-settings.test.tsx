@@ -19,7 +19,6 @@ const {
   fetchLedgerSettings,
   pollingSessions,
   toastError,
-  trackMock,
 } = vi.hoisted(() => ({
   updateLedgerSettingsAction: vi.fn(),
   saveAction: vi.fn(),
@@ -28,12 +27,6 @@ const {
   fetchLedgerSettings: vi.fn(),
   pollingSessions: [] as Array<number | string>,
   toastError: vi.fn(),
-  trackMock: vi.fn(),
-}));
-
-vi.mock("@/lib/telemetry/client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/telemetry/client")>()),
-  track: trackMock,
 }));
 
 vi.mock("@/modules/ledger/server-actions/update", () => ({ updateLedgerSettingsAction }));
@@ -144,30 +137,6 @@ describe("useLedgerSettings", () => {
       });
     });
 
-    it("records a saved setting by its key, never its value, and a failed save not at all", async () => {
-      updateLedgerSettingsAction.mockResolvedValueOnce({ ok: true, ledger });
-      const { result } = setup();
-
-      await act(async () =>
-        result.current.updateLedgerMutation.mutateAsync({ currencies: ["USD", "CNY"] })
-      );
-
-      expect(trackMock).toHaveBeenCalledWith("settings.change", {
-        area: "ledger",
-        action: "save",
-        fields: ["currencies"],
-      });
-
-      trackMock.mockClear();
-      updateLedgerSettingsAction.mockResolvedValueOnce({ ok: false, code: "unexpected" });
-      await act(async () => {
-        await expect(
-          result.current.updateLedgerMutation.mutateAsync({ mainCurrency: "USD" })
-        ).rejects.toThrow();
-      });
-      expect(trackMock).not.toHaveBeenCalledWith("settings.change", expect.anything());
-    });
-
     it("localizes action failures without invalidating queries", async () => {
       updateLedgerSettingsAction.mockResolvedValueOnce({
         ok: false,
@@ -223,24 +192,6 @@ describe("useLedgerSettings", () => {
       expect(invalidate.mock.calls.map(([filters]) => filters!.queryKey)).toEqual([
         queryKeys.ledger(),
       ]);
-    });
-
-    it("records a category save without any category name", async () => {
-      const { result } = setup();
-      saveAction.mockResolvedValue([{ ...category, name: "Dining" }]);
-
-      await act(async () => {
-        await result.current.saveCategories.mutateAsync({
-          expectedRevision: "a".repeat(64),
-          categories: [{ id: category.id, name: "Dining", description: null, icon: null }],
-        });
-      });
-
-      expect(trackMock).toHaveBeenCalledWith("settings.change", {
-        area: "categories",
-        action: "save",
-      });
-      expect(JSON.stringify(trackMock.mock.calls)).not.toContain("Dining");
     });
 
     it("keeps a save pending until broad invalidation settles", async () => {

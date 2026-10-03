@@ -2,10 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GlobalError from "@/app/error";
 
-const { trackMock } = vi.hoisted(() => ({ trackMock: vi.fn() }));
-
-vi.mock("@/lib/telemetry/client", () => ({ track: trackMock }));
-
 const originalLocation = window.location;
 
 describe("error boundary retry buttons", () => {
@@ -13,7 +9,6 @@ describe("error boundary retry buttons", () => {
 
   beforeEach(() => {
     reloadMock = vi.fn();
-    trackMock.mockReset();
     Object.defineProperty(window, "location", {
       configurable: true,
       writable: true,
@@ -39,18 +34,5 @@ describe("error boundary retry buttons", () => {
 
     expect(reloadMock).toHaveBeenCalledTimes(1);
     expect(reset).not.toHaveBeenCalled();
-  });
-
-  it("records the boundary as an $error with its type and digest, never its message", () => {
-    const error = Object.assign(new TypeError("amount 12.50 at Cafe Moli"), { digest: "d1g3st" });
-    render(<GlobalError error={error} reset={vi.fn()} />);
-
-    expect(trackMock).toHaveBeenCalledWith("$error", {
-      kind: "boundary",
-      source: "app/error",
-      name: "TypeError",
-      digest: "d1g3st",
-    });
-    expect(JSON.stringify(trackMock.mock.calls)).not.toContain("Cafe");
   });
 });

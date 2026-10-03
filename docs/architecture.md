@@ -61,7 +61,7 @@ src/modules/<m>/          auth、currency、ledger、source-document、stats、w
 src/server/               跨模块的后台流程：processing、category-assignment、maintenance、
                           stored-files、api-v1 请求管线
 src/lib/                  共享基础设施：db（含租约帮手）、s3、ai、email、logger、env、money、format、
-                          security、drafts、queries 传输层、telemetry（MoliInsight 埋点）
+                          security、drafts、queries 传输层
 src/persistence/          schema（按领域拆文件）和迁移
 src/copy/                 全部界面与邮件文案，按界面区域分文件
 ```
@@ -420,53 +420,6 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
 - 次要文字只用 `text-muted-foreground` 或 `text-muted-foreground/60`。标题用 `font-semibold`，
   `font-bold` 只留给展示数字。
 - 交互控件保留自己的尺寸。Input 和 Textarea 在移动端用 16px，避免 iOS Safari 聚焦时缩放，桌面端 14px。
-
-### 遥测（MoliInsight）
-
-Cashier 把用量和错误事件发给自建的 MoliInsight 平台，用来看录入漏斗、放弃率和 AI 修正率。它是可选的，
-没配置时整套遥测是空操作，应用行为不变。
-
-- **分层。** 所有埋点集中在 `src/lib/telemetry/`：`events.ts` 是事件名和属性的类型表，`client.ts` 是浏览器端
-  的薄封装（`track`、`startOperation`、`trackDialog`、`trackScreenTransition`、`reportWebVital`），
-  `server.ts` 是服务端的 `sendServerEvent`（`server-only`）。功能代码只通过这几个函数埋点，不直接 import SDK。
-  事件的触发点留在各模块里：`src/modules/workspace/telemetry.ts` 放期间和筛选的辅助函数。
-- **启动。** 浏览器端在 `src/instrumentation-client.ts` 里初始化，并在 `onRouterTransitionStart` 里上报
-  `$screen`（只含路径，SDK 自带的屏幕采集已关闭，避免重复）。Web Vitals 由 `components/providers/telemetry-vitals.tsx`
-  经 `useReportWebVitals` 上报。服务端用 `INSIGHT_URL` 和 `INSIGHT_KEY` 创建一个缓存的 Node SDK 实例，事件的 `release`
-  与浏览器端相同（`NEXT_PUBLIC_GIT_SHA`，没有提交号时为 `dev`）。只设置了两个变量中的一个时，应用照常运行，
-  但启动时 `instrumentation.ts` 会记一条警告。
-- **开关。** 两个变量都设置了才启用。`next.config.ts` 在构建时只把"是否设置"内联为
-  `NEXT_PUBLIC_INSIGHT_ENABLED`，值本身不进浏览器；所以改变这两个变量之后需要重新构建部署，浏览器端才会跟着变。
-  测试环境把它们置空，单元测试不会发出任何网络请求。
-- **中继。** 浏览器不持有密钥，事件发到同源的 `POST /api/telemetry`（`src/app/api/telemetry/route.ts`），
-  由 SDK 的 `relayHandler` 带上密钥转发。未配置时返回 204；已配置但没有登录会话时返回 401（用
-  `requireAuth()`，与其他受保护的 API 一致）；会话检查失败或平台不可达时返回 503。登录前产生的事件留在 SDK
-  的本地队列里，登录后补发。`src/proxy.ts` 对没有会话 cookie 的 `/api/*` 请求本来就直接返回 401，这条路由不是例外，行为与路由自己的 401 一致；有 cookie 时由路由检查会话。
-- **命名。** 业务事件用 `area.verb`，小写，只有一个点：`record.open`、`record.input`、`record.submit`、
-  `record.result`、`record.abandon`、`record.draft`、`detail.edit`、`period.switch`、`filter.apply`、
-  `stats.view`、`stats.drilldown`、`settings.change`、`signin.code`、`signin.attempt`，服务端的
-  `processing.finished`。SDK 的标准事件以 `$` 开头：`$op`、`$dialog`、`$toast`、`$error`、`$screen`、`$vital`。
-- **共用入口。** 大多数事件不需要在功能代码里手写：`useLedgerMutation` 要求必填的 `name`，并把每次写入记为
-  `$op`；`postLedgerQuery` 把读取记为 `$op`（`query.<name>`）；`Dialog` 可选的 `name` 记 `$dialog` 的打开和
-  关闭方式；`@/lib/toast` 包装 sonner 并记 `$toast`（只记级别）；`src/app/error.tsx` 记 `$error`。
-  SDK 自带的自动采集只保留 `$visibility`（用量时长）；`$tap`、`$rage_tap`、`$dead_tap` 用 `aria-label` 命名被点的元素，
-  而这里的 label 可能是账本名或分类名，`$error` 的自动采集带 message，可能引用用户输入，所以这几项都关闭
-  （见 `startTelemetry`）。错误由 `error.tsx` 只报类型和 digest；因此 `data-track` 目前不会产生事件。
-- **隐私。** 属性只放类型、代码、个数和时长。不放金额、备注、商户名、账本名、搜索文本、其他用户输入、令牌或图片内容。
-  例如 `record.submit` 只带文本长度和图片张数，`detail.edit` 和 `filter.apply` 只带字段名。
-  新增事件时要同步更新 `events.ts` 和仓库根目录的 `telemetry-catalog.json`，
-  `tests/unit/lib/telemetry/catalog.test.ts` 会检查两者一致。
-- **关联。** `record.submit` 带一个每次提交唯一的 `correlationId`（新建时就是 `clientSubmissionId`，修改后重试
-  时是新的 UUID），`record.result` 带同一个。同一个 id 经过 `ProcessingJobContract.correlationId`
-  到达服务端，`processing.finished` 用它作为事件的 `correlationId`，这样平台可以把浏览器端的提交和服务端的
-  处理结果连起来。Web SDK 的 `track()` 目前不能设置事件的 `correlationId`，所以浏览器端只能把它放在属性里。
-  这是对"任务契约只含 id"的一处偏离：`correlationId` 只存在于内存中的任务契约里，不入库；由 cron 恢复的任务
-  没有它，`processing.finished` 照常发送，只是没有关联 id。瞬时失败而重新调度、以及租约丢失时不发事件，
-  只在一次处理真正结束（完成、失败、取消）时发一次。
-- **登出。** 登出清理只删除 `cashier:` 前缀的本地数据，不碰 `moli_insight_` 开头的键（设备 id 和未发送队列），
-  否则同一个浏览器登出再登录会被算成新设备。
-- **目录。** `telemetry-catalog.json` 描述每个事件、指标（`record_abandon_rate`、`ai_correction_rate` 等）和
-  漏斗（`record_flow`），用 CLI 上传到平台；做法见 README。
 
 ## 8. 决定记录
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import { toast } from "@/lib/toast";
+import { toast } from "sonner";
 import {
   useCategoryAssignmentJob,
   type CategoryAssignmentNotice,

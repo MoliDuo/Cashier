@@ -57,7 +57,6 @@ export function TabNavigation({
       disabled={disabled}
       active={activeTab === value}
       refreshing={refreshing && activeTab === value}
-      track={`nav.${value}`}
       icon={TAB_ICONS[value]}
       label={TAB_LABELS[value]}
       onClick={() => onTabChange(value)}
@@ -83,7 +82,6 @@ export function TabNavigation({
       <button
         type="button"
         disabled={disabled}
-        data-track="nav.new_record"
         onClick={onOpenInput}
         onPointerEnter={onInputIntent}
         onPointerDown={onInputIntent}
@@ -103,8 +101,6 @@ interface NavButtonProps {
   variant: "bottom" | "top";
   active: boolean;
   refreshing: boolean;
-  /** The control's `data-track` name. */
-  track: string;
   icon: typeof ReceiptText;
   label: string;
   onClick: () => void;
@@ -116,7 +112,6 @@ function NavButton({
   variant,
   active,
   refreshing,
-  track,
   icon: Icon,
   label,
   onClick,
@@ -126,7 +121,6 @@ function NavButton({
   return (
     <button
       type="button"
-      data-track={track}
       onClick={onClick}
       disabled={disabled}
       title={disabled ? commonCopy.loading : undefined}

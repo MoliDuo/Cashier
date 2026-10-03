@@ -36,7 +36,6 @@ export function LedgerEntriesOverlays({
   return (
     <>
       <ConfirmDialog
-        name="list.delete_confirm"
         open={deleteConfirmOpen}
         onOpenChange={onDeleteConfirmOpenChange}
         title={ledgerEntriesTabCopy.deleteConfirmTitle}

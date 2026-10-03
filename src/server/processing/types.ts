@@ -5,12 +5,6 @@ export interface ProcessingJobContract {
   sourceDocumentId: string;
   attemptId: string;
   requestedAt: string;
-  /**
-   * The browser's id for the submit that queued this job (its `record.submit`
-   * telemetry event), when there is one. It lives only in the scheduling
-   * closure: a job picked up again by recovery runs without it.
-   */
-  correlationId?: string;
 }
 
 /**

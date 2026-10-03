@@ -81,7 +81,6 @@ export function AccountSettings({
               variant="destructive"
               size="sm"
               disabled={isPending || isSigningOut}
-              data-track="settings.sign_out"
               onClick={() => setSignOutConfirmOpen(true)}
             >
               {settingsCopy.signOut}
