@@ -6,15 +6,15 @@ Moli Cashier 部署在 Moli 服务器上的 Docker 里，地址 <https://cashier
 
 只写名字，不写值。
 
-**GitHub（组织级密钥和变量，本仓库只读取）**
+**GitHub（组织级密钥，本仓库只读取）**
 
 | 名字                             | 用途                                                 |
 | -------------------------------- | ---------------------------------------------------- |
 | `DEPLOY_SSH_KEY`                 | 部署用的 SSH 私钥，服务器上只允许它执行 `deploy-app` |
 | `DEPLOY_TAILSCALE_CLIENT_ID`     | 构建机临时加入内网用的 Tailscale OAuth 客户端        |
 | `DEPLOY_TAILSCALE_CLIENT_SECRET` | 同上的密钥                                           |
-| `DEPLOY_SERVER`（变量）          | 服务器在内网里的地址                                 |
-| `DEPLOY_SERVER_USER`（变量）     | 部署登录用的服务器账号                               |
+| `DEPLOY_SERVER`                  | 服务器在内网里的地址                                 |
+| `DEPLOY_SERVER_USER`             | 部署登录用的服务器账号                               |
 
 **服务器上 `/data/apps/cashier/.env`（权限 600，不进仓库）**
 
