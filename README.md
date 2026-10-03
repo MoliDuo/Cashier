@@ -222,7 +222,7 @@ identity_providers:
         client_name: Cashier
         client_secret: "$pbkdf2-sha512$…"
         public: false
-        authorization_policy: two_factor
+        authorization_policy: one_factor
         consent_mode: implicit
         redirect_uris:
           - https://cashier.example.com/api/auth/callback
