@@ -104,17 +104,13 @@ export function createSmokeOidcServer(config: SmokeOidcConfig): SmokeOidcProvide
   };
 
   const token = async (request: http.IncomingMessage, response: http.ServerResponse) => {
-    const basic = /^Basic (.+)$/.exec(request.headers.authorization ?? "")?.[1];
-    const [id, secret] = Buffer.from(basic ?? "", "base64")
-      .toString("utf8")
-      .split(":");
+    const form = await readForm(request);
     if (
-      decodeURIComponent(id ?? "") !== config.clientId ||
-      decodeURIComponent(secret ?? "") !== config.clientSecret
+      form.get("client_id") !== config.clientId ||
+      form.get("client_secret") !== config.clientSecret
     ) {
       return json(response, 401, { error: "invalid_client" });
     }
-    const form = await readForm(request);
     const issued = codes.get(form.get("code") ?? "");
     codes.delete(form.get("code") ?? "");
     const verifier = form.get("code_verifier") ?? "";
@@ -168,7 +164,7 @@ export function createSmokeOidcServer(config: SmokeOidcConfig): SmokeOidcProvide
           response_types_supported: ["code"],
           subject_types_supported: ["public"],
           id_token_signing_alg_values_supported: ["RS256"],
-          token_endpoint_auth_methods_supported: ["client_secret_basic"],
+          token_endpoint_auth_methods_supported: ["client_secret_post"],
           code_challenge_methods_supported: ["S256"],
         });
       }

@@ -75,7 +75,7 @@ async function getConfiguration(now = Date.now()): Promise<client.Configuration>
     runtimeEnv.oidcClientId,
     // Only RS256 is accepted for the ID token, whatever the provider's metadata lists.
     { id_token_signed_response_alg: "RS256" },
-    client.ClientSecretBasic(runtimeEnv.oidcClientSecret),
+    client.ClientSecretPost(runtimeEnv.oidcClientSecret),
     // Plain http is for a provider on this machine only (tests, local development).
     {
       execute:

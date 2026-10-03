@@ -69,7 +69,7 @@ identity_providers:
         scopes: [openid, profile, email, groups]
         require_pkce: true
         pkce_challenge_method: S256
-        token_endpoint_auth_method: client_secret_basic
+        token_endpoint_auth_method: client_secret_post
 ```
 
 `OIDC_ISSUER_URL` 是 Authelia 的公开地址（例如 `https://auth.example.com`）。邮箱必须在 ID token 的 `email` 里（不再读 userinfo），ID token 只接受 RS256 签名，`iat` 与当前时间相差超过 5 分钟的会被拒绝；提供方标明 `email_verified` 为 false 的邮箱会被拒绝。

@@ -42,7 +42,7 @@
 | `AUTH_SECRET`        | 运行时 | 本地模板提供 | 唯一的内部密钥，会话、登录过程的签名、API key 的密钥都由它派生。               |
 | `OIDC_ISSUER_URL`    | 是     | 无           | OIDC 提供方的 issuer 地址。必须是 https；只有 loopback 地址可以用 http。       |
 | `OIDC_CLIENT_ID`     | 是     | 无           | 在提供方里为 Moli Cashier 注册的 client id（Moli 服务器上是 `moli-cashier`）。 |
-| `OIDC_CLIENT_SECRET` | 是     | 无           | 对应的 client secret，用 `client_secret_basic` 发送。                          |
+| `OIDC_CLIENT_SECRET` | 是     | 无           | 对应的 client secret，用 `client_secret_post` 发送。                           |
 | `DEV_AUTH_BYPASS`    | 否     | `false`      | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。               |
 
 `.env.local.example` 里的内部密钥是公开的固定开发值，只用于 loopback 环境复制后立即启动，
