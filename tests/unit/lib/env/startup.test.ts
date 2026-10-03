@@ -133,6 +133,7 @@ describe("validateStartupEnv", () => {
     expect(Object.keys(ENV_DEFAULTS).sort()).toEqual([
       "AI_MODEL",
       "APP_URL",
+      "APP_VERSION",
       "DATABASE_POOL_MAX",
       "DEV_AUTH_BYPASS",
       "LOG_LEVEL",

@@ -18,6 +18,8 @@ export interface RuntimeEnv {
   readonly s3ForcePathStyle: boolean;
   readonly aiModel: string;
   readonly databasePoolMax: number;
+  /** The commit the image was built from; `dev` outside a deploy build. */
+  readonly appVersion: string;
 }
 
 function hasExplicitValue(name: string): boolean {
@@ -77,5 +79,8 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get databasePoolMax() {
     return getStartupEnvValue("DATABASE_POOL_MAX");
+  },
+  get appVersion() {
+    return getStartupEnvValue("APP_VERSION");
   },
 };

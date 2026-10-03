@@ -1,0 +1,68 @@
+# Deploys the commit that a green ci built (Moli standard 005). The server must have the app
+# registered first (docs/deploy.md); the three DEPLOY_* secrets must be readable by this repository.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false # deploys run one at a time
+
+env:
+  APP: cashier
+  # Where to deploy is an organization variable, not a value in this public repository.
+  SERVER: ${{ vars.DEPLOY_SERVER }}
+  SERVER_USER: ${{ vars.DEPLOY_SERVER_USER }}
+  HOST_KEY: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYuCUIofB2A+wuIb0aVrQgoIJH+UgVIYn0PSZtmFk+q"
+  # (a host key is public; it is checked, not secret)
+
+jobs:
+  deploy:
+    # Only after ci succeeded on main
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Build once; the image is tagged with the commit sha, never latest
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          build-args: VERSION=${{ github.event.workflow_run.head_sha }}
+          tags: moli-${{ env.APP }}:${{ github.event.workflow_run.head_sha }}
+          outputs: type=docker,dest=/tmp/image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Join the tailnet for this run only; the access rules allow only the server SSH port
+      - uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3
+        with:
+          oauth-client-id: ${{ secrets.DEPLOY_TAILSCALE_CLIENT_ID }}
+          oauth-secret: ${{ secrets.DEPLOY_TAILSCALE_CLIENT_SECRET }}
+          tags: tag:github-deploy
+
+      - name: Send the image and deploy
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s %s\n' "$SERVER" "$HOST_KEY" > ~/.ssh/known_hosts
+          # The forced command on the server reads: first line "<app> <sha>", then the image archive
+          { printf '%s %s\n' "$APP" "$SHA"; cat /tmp/image.tar; } \
+            | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes "$SERVER_USER@$SERVER"
+          rm -f ~/.ssh/deploy_key

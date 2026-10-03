@@ -1,0 +1,113 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Work reaches main by a direct push, and the deploy follows a green ci, so this is the gate that
+  # matters. `npm run check` ends in a production build, which is what a bad dependency bump breaks.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run the full gate
+        run: npm run check
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      # Not gitleaks-action: it needs a paid license for organizations. The official image, with
+      # .gitleaks.toml for the per-file false positives.
+      - name: Scan the full history
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner
+
+  # The image is what actually runs: build it as the deploy does, start it with its database and
+  # object store, and check that /healthz answers with the commit it was built from.
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Write throwaway settings
+        run: |
+          cat > ci.env <<'ENV'
+          CASHIER_HOST=cashier.example.com
+          APP_URL=https://cashier.example.com
+          POSTGRES_PASSWORD=ci-throwaway-postgres
+          S3_ACCESS_KEY_ID=ci-throwaway-key
+          S3_SECRET_ACCESS_KEY=ci-throwaway-secret-value
+          AUTH_SECRET=ci-throwaway-auth-secret-value-0123456789
+          OPENAI_API_KEY=ci-throwaway
+          OIDC_ISSUER_URL=https://auth.example.com
+          OIDC_CLIENT_ID=moli-cashier
+          OIDC_CLIENT_SECRET=ci-throwaway
+          ENV
+      - name: Build and start the stack
+        env:
+          APP_VERSION: ${{ github.sha }}
+        run: |
+          docker network create server-internal-net
+          docker compose --env-file ci.env up -d --build --wait
+      - name: Check /healthz reports this commit
+        run: |
+          body=$(docker compose --env-file ci.env exec -T cashier node -e 'fetch("http://127.0.0.1:3000/healthz").then((r) => r.text()).then(console.log)')
+          echo "$body"
+          [ "$body" = "{\"ok\":true,\"version\":\"${{ github.sha }}\"}" ]
+      - name: Show the logs when it fails
+        if: failure()
+        run: docker compose --env-file ci.env logs --tail=100
+
+  # A real browser against a real build is the slowest thing here.
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+      - name: Run the smoke tests
+        run: npm run test:smoke
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: failure()
+        with:
+          name: smoke-failure
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  ci-gate:
+    if: always()
+    needs: [check, gitleaks, build, integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false" ]

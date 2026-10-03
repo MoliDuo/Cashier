@@ -1,18 +1,48 @@
-# Cashier with its PostgreSQL and S3-compatible storage. Copy .env.example to .env first.
+# Moli Cashier with its PostgreSQL and S3-compatible storage, for running it yourself: copy
+# .env.example to .env first. The Moli server does not use this file; its compose lives in
+# deploy/ (see docs/deploy.md).
 name: cashier
 
 services:
-  app:
-    build: .
-    image: cashier:local
-    container_name: cashier-app
+  # Applies the migrations before the app starts, then exits. A failed migration stops `up` here and
+  # leaves the database as it was.
+  migrate:
+    image: moli-cashier:local
+    container_name: cashier-migrate
+    restart: "no"
+    command: ["npm", "run", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://cashier:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/cashier?sslmode=disable
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
+      APP_URL: ${APP_URL:?set APP_URL to https://<CASHIER_HOST>}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?set OIDC_ISSUER_URL}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set OIDC_CLIENT_SECRET}
+      S3_ENDPOINT: http://s3:7070
+      S3_BUCKET: cashier
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+    networks:
+      - internal
+
+  cashier:
+    build:
+      context: .
+      args:
+        VERSION: ${APP_VERSION:-local}
+    image: moli-cashier:local
+    container_name: cashier
     init: true
     restart: unless-stopped
     # The app gives its work 20 seconds to finish after SIGTERM, then hands the rest back.
     stop_grace_period: 30s
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       storage-bootstrap:
         condition: service_completed_successfully
     environment:
@@ -39,7 +69,7 @@ services:
         - CMD
         - node
         - -e
-        - 'fetch("http://127.0.0.1:3000/api/health").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))'
+        - 'fetch("http://127.0.0.1:3000/healthz").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))'
       interval: 30s
       timeout: 5s
       start_period: 90s

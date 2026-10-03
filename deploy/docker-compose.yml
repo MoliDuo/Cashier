@@ -1,0 +1,103 @@
+# The Moli server's compose for Moli Cashier: /data/apps/cashier/docker-compose.yml (docs/deploy.md).
+# The administrator keeps this file on the server. The deploy only rewrites .tag, which holds
+# APP_TAG=<commit sha>; start with: docker compose --env-file .tag up -d
+# Secrets come from .env (mode 600) through env_file, not through ${...}: --env-file replaces the
+# default .env for interpolation.
+services:
+  cashier:
+    image: moli-cashier:${APP_TAG}
+    container_name: cashier
+    init: true
+    restart: unless-stopped
+    # The app gives its work 20 seconds to finish after SIGTERM, then hands the rest back.
+    stop_grace_period: 30s
+    env_file: .env
+    environment:
+      TZ: Asia/Kuala_Lumpur
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - 'fetch("http://127.0.0.1:3000/healthz").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))'
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+    networks:
+      - internal
+      - server-internal-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=server-internal-net
+      - traefik.http.routers.cashier.rule=Host(`cashier.xiangyu.pro`)
+      - traefik.http.routers.cashier.entrypoints=websecure
+      - traefik.http.services.cashier.loadbalancer.server.port=3000
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: cashier-postgres
+    restart: unless-stopped
+    env_file: .env # POSTGRES_PASSWORD
+    environment:
+      TZ: Asia/Kuala_Lumpur
+      POSTGRES_DB: cashier
+      POSTGRES_USER: cashier
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashier -d cashier"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - internal
+
+  # Versity S3 Gateway over a plain directory: each bucket is a folder and each object a file.
+  s3:
+    image: ghcr.io/versity/versitygw:v1.8.0
+    container_name: cashier-s3
+    restart: unless-stopped
+    command: ["posix", "/data"]
+    env_file: .env # ROOT_ACCESS_KEY_ID, ROOT_SECRET_ACCESS_KEY
+    environment:
+      TZ: Asia/Kuala_Lumpur
+      VGW_PORT: ":7070"
+      VGW_REGION: auto
+      VGW_HEALTH: /health
+    volumes:
+      - ./data/s3:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:7070/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - internal
+
+  # Creates the private bucket once, then exits.
+  storage-bootstrap:
+    image: amazon/aws-cli:2.37.9
+    container_name: cashier-storage-bootstrap
+    depends_on:
+      s3:
+        condition: service_healthy
+    restart: "no"
+    env_file: .env # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+    environment:
+      AWS_DEFAULT_REGION: auto
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - aws --endpoint-url http://s3:7070 s3api head-bucket --bucket cashier 2>/dev/null || aws --endpoint-url http://s3:7070 s3api create-bucket --bucket cashier
+    networks:
+      - internal
+
+networks:
+  internal:
+  server-internal-net:
+    external: true

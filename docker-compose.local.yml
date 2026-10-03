@@ -1,3 +1,4 @@
+# Development only: ports are published on 127.0.0.1 and the credentials are public local values.
 services:
   postgres:
     image: postgres:17-alpine
@@ -29,7 +30,7 @@ services:
     volumes:
       - cashier_s3:/data
     ports:
-      - "${S3_PORT:-9000}:7070"
+      - "127.0.0.1:${S3_PORT:-9000}:7070"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:7070/health"]
       interval: 5s

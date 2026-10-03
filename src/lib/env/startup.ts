@@ -10,6 +10,7 @@ export const ENV_DEFAULTS = {
   LOG_LEVEL: "info",
   DEV_AUTH_BYPASS: "false",
   DATABASE_POOL_MAX: "10",
+  APP_VERSION: "dev",
 } as const;
 
 function blankToUndefined(value: unknown): unknown {
@@ -73,6 +74,7 @@ const startupEnvFields = {
   TZ: stringWithDefault("TZ"),
   AI_MODEL: stringWithDefault("AI_MODEL"),
   LOG_LEVEL: stringWithDefault("LOG_LEVEL"),
+  APP_VERSION: stringWithDefault("APP_VERSION"),
   DEV_AUTH_BYPASS: booleanStringWithDefault("DEV_AUTH_BYPASS"),
   DATABASE_POOL_MAX: z.preprocess(
     blankToUndefined,

@@ -1,6 +1,6 @@
-# Cashier runs as one long-lived Node process. The image keeps the sources and the full
-# node_modules rather than a standalone output: the entrypoint migrates the database and the
-# account commands run through tsx, and both need them.
+# Moli Cashier runs as one long-lived Node process. The image keeps the sources and the full
+# node_modules rather than a standalone output: the migration and the account commands run through
+# tsx, and both need them.
 FROM node:24-bookworm-slim
 
 ENV NODE_ENV=production \
@@ -28,6 +28,11 @@ RUN DATABASE_URL=postgresql://build:build@127.0.0.1:1/build \
     S3_SECRET_ACCESS_KEY=build \
     npm run build \
  && chown -R node:node /app
+
+# The commit sha the deploy builds from; /healthz reports it so the deploy can confirm what is
+# running. Set after the build so a new sha does not invalidate the install and build layers.
+ARG VERSION=dev
+ENV APP_VERSION=$VERSION
 
 USER node
 EXPOSE 3000

@@ -13,6 +13,7 @@ playwright-report
 test-results
 data
 docs
+deploy
 tests
 *.tsbuildinfo
 repomix-output.xml
