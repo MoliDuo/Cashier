@@ -4,7 +4,7 @@ import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { startOidcProviderForTests } from "tests/helpers/oidc-provider";
 import { GET as login } from "@/app/api/auth/login/route";
-import { GET as callback } from "@/app/api/auth/callback/route";
+import { GET as callback } from "@/app/auth/callback/route";
 import { startSession } from "@/modules/auth/server/current-session";
 
 const provider = startOidcProviderForTests();
@@ -18,7 +18,7 @@ function loginRequest(callbackUrl?: string) {
 }
 
 function callbackRequest(query: URLSearchParams, flowCookie?: string) {
-  const url = new URL(`http://localhost:3000/api/auth/callback?${query}`);
+  const url = new URL(`http://localhost:3000/auth/callback?${query}`);
   return new NextRequest(url, {
     headers: flowCookie == null ? {} : { cookie: `cashier_oidc=${flowCookie}` },
   });
@@ -50,7 +50,7 @@ describe("GET /api/auth/login", () => {
       .slice(1)
       .map((v) => v.toLowerCase());
     expect(attributes).toEqual(
-      expect.arrayContaining(["path=/api/auth", "httponly", "samesite=lax", "max-age=600"])
+      expect.arrayContaining(["path=/auth/callback", "httponly", "samesite=lax", "max-age=600"])
     );
     // APP_URL is http here, so the cookie may travel over http.
     expect(attributes).not.toContain("secure");
@@ -80,7 +80,7 @@ describe("GET /api/auth/login", () => {
   });
 });
 
-describe("GET /api/auth/callback", () => {
+describe("GET /auth/callback", () => {
   it("opens a session for a bound address and goes where the visitor was headed", async () => {
     const { userId } = await createTestUserWithLedger(getTestDb(), "me@example.com");
     provider.signInAs({ email: "Me@Example.com" });
@@ -103,7 +103,7 @@ describe("GET /api/auth/callback", () => {
     const cleared = cookieOf(response, "cashier_oidc")!;
     expect(cleared[0]).toBe("cashier_oidc=");
     expect(cleared.map((v) => v.toLowerCase())).toEqual(
-      expect.arrayContaining(["path=/api/auth", "max-age=0"])
+      expect.arrayContaining(["path=/auth/callback", "max-age=0"])
     );
   });
 
@@ -144,7 +144,7 @@ describe("GET /api/auth/callback", () => {
     await createTestUserWithLedger(getTestDb(), "me@example.com");
     provider.signInAs({ email: "me@example.com" });
     const { query, flowCookie } = await comeBack();
-    const request = new NextRequest(`http://attacker.example/api/auth/callback?${query}`, {
+    const request = new NextRequest(`http://attacker.example/auth/callback?${query}`, {
       headers: { cookie: `cashier_oidc=${flowCookie}`, host: "attacker.example" },
     });
 

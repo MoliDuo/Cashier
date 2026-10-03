@@ -41,7 +41,7 @@ describe("POST /api/auth/logout", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(jar.has(SESSION_COOKIE_NAME)).toBe(false);
+    expect(jar.get(SESSION_COOKIE_NAME) ?? "").toBe("");
     expect(await getTestDb().select().from(sessions)).toEqual([]);
     await expect(getCurrentSession()).resolves.toBeNull();
   });

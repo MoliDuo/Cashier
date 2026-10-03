@@ -13,12 +13,12 @@ import { deriveKey } from "./keys";
 
 export const DOMAIN_PREFIX = "credential:v1:";
 const TOKEN_PREFIX = "sk_live_";
-const TOKEN_HEX_LENGTH = 48; // 24 random bytes => 48 hex chars
+const TOKEN_HEX_LENGTH = 64; // 32 random bytes => 64 hex chars (tokens issued earlier were 48 and still verify)
 export const DISPLAY_PREFIX_LENGTH = 8;
 export const DISPLAY_SUFFIX_LENGTH = 4;
 
 /**
- * Generate a random 48-hex-char token (with `sk_live_` prefix), compute its
+ * Generate a random 64-hex-char token (with `sk_live_` prefix), compute its
  * HMAC-SHA-256 hash, and return everything needed for storage and display.
  */
 export function createToken(): {

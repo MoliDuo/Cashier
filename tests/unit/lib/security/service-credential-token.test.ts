@@ -51,9 +51,9 @@ describe("createToken", () => {
   it("generates a well-formed token with hash, prefix, and suffix", () => {
     const result = createToken();
 
-    // Token shape: sk_live_<48 hex chars>
-    expect(result.token).toMatch(/^sk_live_[0-9a-f]{48}$/);
-    expect(result.token.length).toBe(8 + 48); // "sk_live_" + 48 hex chars
+    // Token shape: sk_live_<64 hex chars>
+    expect(result.token).toMatch(/^sk_live_[0-9a-f]{64}$/);
+    expect(result.token.length).toBe(8 + 64); // "sk_live_" + 64 hex chars
 
     // Hash is 64 hex chars (SHA-256)
     expect(result.hash).toMatch(/^[0-9a-f]{64}$/);

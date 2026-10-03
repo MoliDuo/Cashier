@@ -19,8 +19,8 @@ describe("OIDC sign-in", () => {
     const params = authorizationUrl.searchParams;
     expect(params.get("response_type")).toBe("code");
     expect(params.get("client_id")).toBe("cashier-test");
-    expect(params.get("scope")).toBe("openid email");
-    expect(params.get("redirect_uri")).toBe("http://localhost:3000/api/auth/callback");
+    expect(params.get("scope")).toBe("openid profile email groups");
+    expect(params.get("redirect_uri")).toBe("http://localhost:3000/auth/callback");
     expect(params.get("code_challenge_method")).toBe("S256");
     for (const name of ["state", "nonce", "code_challenge"]) {
       expect(params.get(name)).toMatch(/^[\w-]{20,}$/);
@@ -48,14 +48,20 @@ describe("OIDC sign-in", () => {
     });
   });
 
-  it("reads the address from userinfo when the ID token leaves it out", async () => {
+  it("refuses an ID token without the address, even when userinfo has it", async () => {
     provider.signInAs({ email: "me@example.com", emailInIdToken: false });
     const { flowCookie, query } = await trip();
 
-    await expect(completeOidcLogin({ query, flowCookie })).resolves.toMatchObject({
-      status: "authenticated",
-      email: "me@example.com",
-    });
+    await expect(completeOidcLogin({ query, flowCookie })).resolves.toEqual({ status: "failed" });
+  });
+
+  it("refuses an ID token that was issued more than five minutes ago", async () => {
+    provider.signInAs({ email: "me@example.com" });
+    const { flowCookie, query } = await trip();
+
+    await expect(
+      completeOidcLogin({ query, flowCookie, now: Date.now() + 6 * 60 * 1000 })
+    ).resolves.toEqual({ status: "failed" });
   });
 
   it("accepts an address the provider marks verified, and refuses one it marks unverified", async () => {

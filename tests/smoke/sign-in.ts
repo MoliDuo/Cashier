@@ -48,8 +48,10 @@ export async function signIn(page: Page): Promise<void> {
     {
       name: SESSION_COOKIE_NAME,
       value: token,
-      url: requiredEnv("SMOKE_BASE_URL"),
+      domain: new URL(requiredEnv("SMOKE_BASE_URL")).hostname,
+      path: "/",
       httpOnly: true,
+      secure: true,
       sameSite: "Lax",
     },
   ]);

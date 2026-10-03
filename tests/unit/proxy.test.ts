@@ -18,7 +18,7 @@ describe("proxy", () => {
     });
 
     it("lets the sign-in routes through without a session, since that is how one starts", () => {
-      for (const path of ["/api/auth/login", "/api/auth/callback"]) {
+      for (const path of ["/api/auth/login", "/auth/callback"]) {
         expect(proxy(createRequest(path)).status).toBe(200);
       }
     });
@@ -62,7 +62,7 @@ describe("proxy", () => {
     });
 
     it("answers the health check without a session", () => {
-      expect(proxy(createRequest("/api/health")).status).toBe(200);
+      expect(proxy(createRequest("/healthz")).status).toBe(200);
     });
 
     it("does not treat the retired cron route as public", () => {

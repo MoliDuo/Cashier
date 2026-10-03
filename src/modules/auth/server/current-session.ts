@@ -1,7 +1,6 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { SESSION_COOKIE_NAME } from "@/modules/auth/constants";
 import { createSession, deleteSession, readSession, type SessionUser } from "./sessions";
 
@@ -11,10 +10,6 @@ export const getCurrentSession = cache(async (): Promise<SessionUser | null> => 
   if (token == null || token === "") return null;
   return readSession(token);
 });
-
-function secureCookies(): boolean {
-  return new URL(runtimeEnv.appUrl).protocol === "https:";
-}
 
 /**
  * Signs the browser in: replaces the session its cookie named, if any, with a
@@ -27,7 +22,7 @@ export async function startSession(userId: string): Promise<void> {
   const { token, expiresAt } = await createSession(userId);
   jar.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: secureCookies(),
+    secure: true,
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
@@ -39,5 +34,12 @@ export async function endSession(): Promise<void> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE_NAME)?.value;
   if (token != null && token !== "") await deleteSession(token);
-  jar.delete(SESSION_COOKIE_NAME);
+  // Not jar.delete(): browsers refuse to change a `__Host-` cookie unless the response is Secure too.
+  jar.set(SESSION_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }

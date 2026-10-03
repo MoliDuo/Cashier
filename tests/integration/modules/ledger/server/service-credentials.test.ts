@@ -92,7 +92,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     expect(createRes.name).toBe("Test Credential");
 
     // The token should match the expected format
-    expect(createRes.token).toMatch(/^sk_live_[0-9a-f]{48}$/);
+    expect(createRes.token).toMatch(/^sk_live_[0-9a-f]{64}$/);
 
     // Verify hash is stored, not plaintext
     const db = getTestDb();

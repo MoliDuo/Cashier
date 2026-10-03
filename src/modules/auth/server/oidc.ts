@@ -8,22 +8,27 @@ import { sanitizeCallbackPath } from "../domain/callback-path";
 
 /** The cookie that carries one sign-in attempt from the redirect out to the one back. */
 export const OIDC_FLOW_COOKIE_NAME = "cashier_oidc";
-const OIDC_CALLBACK_PATH = "/api/auth/callback";
+const OIDC_CALLBACK_PATH = "/auth/callback";
 /** The provider has this long to send the browser back. */
 const OIDC_FLOW_MAX_AGE_SECONDS = 10 * 60;
 
-/** Cookie attributes for the flow cookie; `maxAge: 0` with the same path clears it. */
+/**
+ * Cookie attributes for the flow cookie; `maxAge: 0` with the same path clears it. The path is the
+ * callback's, so the cookie goes nowhere else.
+ */
 export function oidcFlowCookieOptions(maxAgeSeconds = OIDC_FLOW_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
     secure: new URL(runtimeEnv.appUrl).protocol === "https:",
     sameSite: "lax" as const,
-    path: "/api/auth",
+    path: OIDC_CALLBACK_PATH,
     maxAge: maxAgeSeconds,
   };
 }
 
-const SCOPE = "openid email";
+const SCOPE = "openid profile email groups";
+/** How far an ID token's `iat` may be from now. */
+const ID_TOKEN_MAX_AGE_SECONDS = 5 * 60;
 const CONFIGURATION_TTL_MS = 60 * 60 * 1000;
 
 interface FlowState {
@@ -68,7 +73,8 @@ async function getConfiguration(now = Date.now()): Promise<client.Configuration>
   const value = client.discovery(
     issuer,
     runtimeEnv.oidcClientId,
-    undefined,
+    // Only RS256 is accepted for the ID token, whatever the provider's metadata lists.
+    { id_token_signed_response_alg: "RS256" },
     client.ClientSecretBasic(runtimeEnv.oidcClientSecret),
     // Plain http is for a provider on this machine only (tests, local development).
     {
@@ -147,9 +153,9 @@ export async function startOidcLogin(
 
 /**
  * Finishes a sign-in from what the provider sent back: checks state, PKCE, nonce
- * and the ID token's signature, and reads the address the provider vouches for.
- * The address comes from the ID token, or from the userinfo endpoint when the
- * provider keeps it out of the token.
+ * and the ID token's signature, issuer, audience and age, and reads the address the
+ * provider vouches for. The address must be in the ID token itself (the provider's
+ * claims policy puts it there); userinfo is never a substitute for a verified token.
  */
 export async function completeOidcLogin(input: {
   query: URLSearchParams;
@@ -174,13 +180,16 @@ export async function completeOidcLogin(input: {
     const claims = tokens.claims();
     if (claims == null) return { status: "failed" };
 
-    let email = claims.email;
-    let emailVerified = claims.email_verified;
-    if (typeof email !== "string") {
-      const userInfo = await client.fetchUserInfo(configuration, tokens.access_token, claims.sub);
-      email = userInfo.email;
-      emailVerified = userInfo.email_verified;
+    const nowSeconds = Math.floor(now / 1000);
+    if (
+      typeof claims.iat !== "number" ||
+      nowSeconds - claims.iat > ID_TOKEN_MAX_AGE_SECONDS ||
+      claims.iat - nowSeconds > ID_TOKEN_MAX_AGE_SECONDS
+    ) {
+      return { status: "failed" };
     }
+
+    const { email, email_verified: emailVerified } = claims;
     if (typeof email !== "string" || email.trim() === "" || emailVerified === false) {
       return { status: "failed" };
     }

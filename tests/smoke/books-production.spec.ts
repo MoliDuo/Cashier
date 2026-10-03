@@ -439,7 +439,7 @@ test("books production files an API upload into the book its key is bound to", a
 
   const tokenDialog = page.getByRole("dialog").last();
   const tokenMatch = (await tokenDialog.locator("div.break-all").innerText()).match(
-    /sk_live_[0-9a-f]{48}/
+    /sk_live_[0-9a-f]{64}/
   );
   const token = tokenMatch?.[0];
   expect(token).toBeTruthy();
