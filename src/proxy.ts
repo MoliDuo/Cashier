@@ -11,7 +11,7 @@ export default function proxy(req: NextRequest) {
   // proxy has no database, so it only turns away requests with no session
   // cookie at all; each route reads and checks the session itself.
   if (pathname.startsWith("/api/")) {
-    const isPublicApi = pathname.startsWith("/api/v1/");
+    const isPublicApi = pathname.startsWith("/api/v1/") || pathname === "/api/health";
     if (!isPublicApi && (sessionToken == null || sessionToken === "")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

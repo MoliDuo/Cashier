@@ -168,7 +168,7 @@ npm run account:enroll -- --email you@example.com
 
 ## 部署（Docker）
 
-Cashier 以一个常驻的 Node 进程运行在 Docker 里，和 PostgreSQL、MinIO 一起由 `compose.yaml` 编排。
+Cashier 以一个常驻的 Node 进程运行在 Docker 里，和 PostgreSQL、S3 兼容的对象存储（Versity S3 Gateway）一起由 `compose.yaml` 编排。
 后台提取、批量分类和每日维护都在应用进程内完成，不需要外部的定时任务或队列。
 
 ### 准备
@@ -193,7 +193,11 @@ docker compose up -d --build
 ```
 
 应用容器的入口先在 advisory lock 下、一个事务里执行迁移，成功后才启动服务；迁移失败时容器退出，数据库保持原样。
-Postgres 和 MinIO 只在 compose 的内部网络里，不占用宿主机端口。应用监听容器内的 3000 端口，由反向代理转发。
+Postgres 和对象存储只在 compose 的内部网络里，不占用宿主机端口。应用监听容器内的 3000 端口，由反向代理转发。
+
+对象存储用 Versity S3 Gateway 的 posix 后端：存储桶是 `${CASHIER_DATA_DIR}/s3/` 下的目录，对象就是里面的文件，
+所以数据目录的一个快照就是完整备份。数据目录所在的文件系统需要支持扩展属性（ext4、XFS、ZFS 都支持）。
+没有用 MinIO，是因为它不再发布社区版镜像，`quay.io/minio` 上的旧镜像已经拉取不到。
 
 创建账号和注册链接（命令在应用容器里执行，读取容器自己的环境变量）：
 
@@ -232,7 +236,7 @@ passkey 和手机相机都要求 HTTPS，所以应用前面必须有终止 TLS �
 
 升级前：
 
-1. 备份 PostgreSQL 和 MinIO 的数据目录（`CASHIER_DATA_DIR` 下的 `postgres`、`minio`）。如果数据目录在 ZFS 上，
+1. 备份 PostgreSQL 和对象存储的数据目录（`CASHIER_DATA_DIR` 下的 `postgres`、`s3`）。如果数据目录在 ZFS 上，
    先打一个快照最简单。
 2. 记录当前部署的 Git 提交号。
 3. 阅读目标版本的提交记录和迁移变化。

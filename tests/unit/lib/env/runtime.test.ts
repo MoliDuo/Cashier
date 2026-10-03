@@ -40,7 +40,7 @@ describe("runtimeEnv", () => {
       AUTH_EMAIL_FROM: "Cashier <security@example.com>",
       LOG_LEVEL: "warn",
       TZ: "UTC",
-      TRUSTED_PROXY: "platform",
+      TRUSTED_PROXY: "proxy",
       AUTH_RESEND_KEY: "re_test",
       OPENAI_BASE_URL: "https://openai-proxy.example/v1",
     };
@@ -57,7 +57,7 @@ describe("runtimeEnv", () => {
     expect(runtimeEnv.s3Bucket).toBe("cashier-images");
     expect(runtimeEnv.s3AccessKeyId).toBe("test-access-key");
     expect(runtimeEnv.s3SecretAccessKey).toBe("test-secret-key");
-    expect(runtimeEnv.trustedProxy).toBe("platform");
+    expect(runtimeEnv.trustedProxy).toBe("proxy");
     expect(runtimeEnv.aiModel).toBe("custom-model");
   });
 

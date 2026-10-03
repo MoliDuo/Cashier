@@ -97,7 +97,7 @@ describe("authenticateWithOTP", () => {
   });
 
   it("charges the IP verification bucket before looking up a token", async () => {
-    process.env.TRUSTED_PROXY = "platform";
+    process.env.TRUSTED_PROXY = "proxy";
     const consume = vi.spyOn(rateLimit, "consumeRateLimit");
 
     await expect(
@@ -160,7 +160,7 @@ describe("authenticateWithOTP", () => {
   });
 
   it("returns otp_rate_limited when verify attempts exceed the IP limit", async () => {
-    process.env.TRUSTED_PROXY = "platform";
+    process.env.TRUSTED_PROXY = "proxy";
     await createTestOTP(TEST_EMAIL, "123456");
 
     for (let i = 0; i < 5; i++) {

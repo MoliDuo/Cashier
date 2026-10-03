@@ -30,8 +30,8 @@ npm-debug.log*
 !.env.example
 !.env.local.example
 
-# vercel
-.vercel
+# docker deployment data
+/data/
 
 # typescript
 *.tsbuildinfo

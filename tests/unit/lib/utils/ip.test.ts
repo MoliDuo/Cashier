@@ -2,13 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { getClientIPFromHeaders } from "@/lib/utils/ip";
 
 const originalTrustedProxy = process.env.TRUSTED_PROXY;
-const originalVercel = process.env.VERCEL;
 
 afterEach(() => {
   if (originalTrustedProxy === undefined) delete process.env.TRUSTED_PROXY;
   else process.env.TRUSTED_PROXY = originalTrustedProxy;
-  if (originalVercel === undefined) delete process.env.VERCEL;
-  else process.env.VERCEL = originalVercel;
 });
 
 describe("trusted proxy handling", () => {
@@ -23,24 +20,14 @@ describe("trusted proxy handling", () => {
   });
 
   it("accepts a single validated Docker proxy address", () => {
-    process.env.TRUSTED_PROXY = "platform";
-    delete process.env.VERCEL;
+    process.env.TRUSTED_PROXY = "proxy";
     const headers = new Headers({ "x-real-ip": "198.51.100.20" });
 
     expect(getClientIPFromHeaders(headers)).toBe("198.51.100.20");
   });
 
-  it("accepts a single validated Vercel address", () => {
-    process.env.TRUSTED_PROXY = "platform";
-    process.env.VERCEL = "1";
-    const headers = new Headers({ "x-vercel-forwarded-for": "2001:db8::1" });
-
-    expect(getClientIPFromHeaders(headers)).toBe("2001:db8::1");
-  });
-
-  it("rejects multi-value, empty, and invalid platform addresses", () => {
-    process.env.TRUSTED_PROXY = "platform";
-    delete process.env.VERCEL;
+  it("rejects multi-value, empty, and invalid proxy addresses", () => {
+    process.env.TRUSTED_PROXY = "proxy";
 
     expect(getClientIPFromHeaders(new Headers({ "x-real-ip": "198.51.100.20, 10.0.0.1" }))).toBe(
       "unknown"

@@ -59,6 +59,10 @@ describe("proxy", () => {
       expect(proxy(createRequest("/api/v1/documents")).status).toBe(200);
     });
 
+    it("answers the health check without a session", () => {
+      expect(proxy(createRequest("/api/health")).status).toBe(200);
+    });
+
     it("does not treat the retired cron route as public", () => {
       expect(proxy(createRequest("/api/cron/daily")).status).toBe(401);
     });

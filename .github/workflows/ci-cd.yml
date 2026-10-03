@@ -29,6 +29,13 @@ jobs:
       - name: Run the full gate
         run: npm run check
 
+  # The image is what actually runs, so a Dockerfile that stops building is caught here. Nothing is pushed.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build --tag cashier:ci .
+
   # A real browser against a real build is the slowest thing here, so it waits
   # for the merge rather than running on every push and every PR.
   smoke:

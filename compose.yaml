@@ -1,0 +1,124 @@
+# Cashier with its PostgreSQL and S3-compatible storage. Copy .env.example to .env first.
+name: cashier
+
+services:
+  app:
+    build: .
+    image: cashier:local
+    container_name: cashier-app
+    init: true
+    restart: unless-stopped
+    # The app gives its work 20 seconds to finish after SIGTERM, then hands the rest back.
+    stop_grace_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Asia/Kuala_Lumpur}
+      APP_URL: ${APP_URL:?set APP_URL to https://<CASHIER_HOST>}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
+      AUTH_RESEND_KEY: ${AUTH_RESEND_KEY:-}
+      AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      AI_MODEL: ${AI_MODEL:-}
+      DATABASE_URL: postgresql://cashier:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/cashier?sslmode=disable
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-}
+      S3_ENDPOINT: http://s3:7070
+      S3_REGION: auto
+      S3_BUCKET: cashier
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      S3_FORCE_PATH_STYLE: "true"
+      TRUSTED_PROXY: ${TRUSTED_PROXY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - 'fetch("http://127.0.0.1:3000/api/health").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))'
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+    networks:
+      - internal
+      - server-internal-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=server-internal-net
+      - traefik.http.routers.cashier.rule=Host(`${CASHIER_HOST:?set CASHIER_HOST}`)
+      - traefik.http.routers.cashier.entrypoints=websecure
+      - traefik.http.services.cashier.loadbalancer.server.port=3000
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: cashier-postgres
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Kuala_Lumpur}
+      POSTGRES_DB: cashier
+      POSTGRES_USER: cashier
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - ${CASHIER_DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashier -d cashier"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - internal
+
+  # Versity S3 Gateway over a plain directory: each bucket is a folder and each object a file, so
+  # a snapshot of the data directory is a complete backup. The directory's filesystem needs
+  # extended attributes (ext4, XFS and ZFS have them).
+  s3:
+    image: ghcr.io/versity/versitygw:v1.8.0
+    container_name: cashier-s3
+    restart: unless-stopped
+    command: ["posix", "/data"]
+    environment:
+      TZ: ${TZ:-Asia/Kuala_Lumpur}
+      ROOT_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      ROOT_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      VGW_PORT: ":7070"
+      VGW_REGION: auto
+      VGW_HEALTH: /health
+    volumes:
+      - ${CASHIER_DATA_DIR:-./data}/s3:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:7070/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - internal
+
+  # Creates the private bucket once, then exits.
+  storage-bootstrap:
+    image: amazon/aws-cli:2.37.9
+    container_name: cashier-storage-bootstrap
+    depends_on:
+      s3:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: auto
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - aws --endpoint-url http://s3:7070 s3api head-bucket --bucket cashier 2>/dev/null || aws --endpoint-url http://s3:7070 s3api create-bucket --bucket cashier
+    networks:
+      - internal
+
+networks:
+  internal:
+  # Where Traefik reaches the apps it routes to. Drop this network and the labels to use another
+  # reverse proxy.
+  server-internal-net:
+    external: true

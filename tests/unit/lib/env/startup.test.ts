@@ -70,7 +70,7 @@ describe("validateStartupEnv", () => {
     expect(result.DATABASE_POOL_MAX).toBe(10);
   });
 
-  it("accepts an absent or platform-managed trusted proxy", () => {
+  it("accepts an absent or proxy-managed trusted proxy", () => {
     expect(
       validateStartupEnv({
         ...baseEnv,
@@ -82,9 +82,9 @@ describe("validateStartupEnv", () => {
       validateStartupEnv({
         ...baseEnv,
         NODE_ENV: "production",
-        TRUSTED_PROXY: "platform",
+        TRUSTED_PROXY: "proxy",
       }).TRUSTED_PROXY
-    ).toBe("platform");
+    ).toBe("proxy");
 
     expect(() =>
       validateStartupEnv({

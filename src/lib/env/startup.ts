@@ -78,7 +78,7 @@ const startupEnvFields = {
   S3_ACCESS_KEY_ID: requiredString("S3_ACCESS_KEY_ID"),
   S3_SECRET_ACCESS_KEY: requiredString("S3_SECRET_ACCESS_KEY"),
   S3_FORCE_PATH_STYLE: booleanStringWithDefault("S3_FORCE_PATH_STYLE"),
-  TRUSTED_PROXY: z.preprocess(blankToUndefined, z.literal("platform").optional()),
+  TRUSTED_PROXY: z.preprocess(blankToUndefined, z.literal("proxy").optional()),
   TZ: stringWithDefault("TZ"),
   AI_MODEL: stringWithDefault("AI_MODEL"),
   LOG_LEVEL: stringWithDefault("LOG_LEVEL"),

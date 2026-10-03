@@ -8,7 +8,7 @@
 - **一个账户、一个账本、多个分账。** 账本是单例，分账（books）是用户真正会看到的分区。
 - **一个账户可以挂多个登录邮箱，实际有两个人在用。** "两个人同时编辑同一张票据"是真实会发生的情况，
   但频率很低。
-- **自建，跑在自己机器的 Docker 里。** 一个常驻的 Node 进程，加 Postgres 和 S3 兼容的对象存储（MinIO），
+- **自建，跑在自己机器的 Docker 里。** 一个常驻的 Node 进程，加 Postgres 和 S3 兼容的对象存储（Versity S3 Gateway），
   前面是自己的反向代理。没有函数寿命、请求体大小或调度频率的平台限制，后台工作由同一个进程里的 worker 和
   调度器完成。本地开发走同一条应用路径。
 - **AI 调用又慢又贵，还可能失败。** 一次提取可能要几十秒，服务商会限流，进程也可能在调用中途被重启或崩溃。
@@ -239,7 +239,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   的请求体上限，由仓库测试保证；否则超出的部分会被静默截断。
 - 读取一律经过带授权的 `/api/stored-files/{fileId}`，响应头 `Cache-Control: private, no-store`。
   实现在 `src/server/stored-files/`，测试通过 mock `@/lib/storage/s3` 替换对象存储。浏览器从不直接访问
-  对象存储，所以 MinIO 只在容器内部网络里可达。
+  对象存储，所以对象存储只在容器内部网络里可达。
 
 ### 每日维护
 
@@ -468,7 +468,7 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   迁移 0025 删掉 `effective_date`。旧前缀下的 1321 张图片用一次性脚本搬到了 `stored/<id>`，
   孤儿扫描随后只看 `stored/`。
 
-- **之后：自建，脱离 Vercel。** 部署目标改成自己机器上的 Docker（应用、Postgres、MinIO，前面是现有的 Traefik），
+- **之后：自建，脱离 Vercel。** 部署目标改成自己机器上的 Docker（应用、Postgres、对象存储，前面是现有的 Traefik），
   拆掉所有为平台限制而设的设计：`after()` 与"轮询顺带恢复"换成进程内 worker，每日 cron 换成进程内调度器，
   函数预算、`maxDuration` 和 `FUNCTION_MAX_DURATION_SECONDS` 删除，S3 预签名直传两阶段换成经应用的一步上传
   （迁移 0026 删掉 `stored_files.finalized_at`），迁移改成停机迁移。租约、fencing、认领比较交换、先写持久记录

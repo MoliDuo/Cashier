@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   // terminal and the browser console.
   devIndicators: false,
   // `npm run check` type-checks with `next typegen && tsc` before it builds,
-  // so its build skips Next's second, identical pass. Vercel never sets this.
+  // so its build skips Next's second, identical pass.
   ...(process.env.CASHIER_CHECK_BUILD === "1" ? { typescript: { ignoreBuildErrors: true } } : {}),
   experimental: {
     // `proxy.ts` buffers the request body, and by default only the first 10 MB of it: past that the
